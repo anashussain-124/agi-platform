@@ -39,18 +39,43 @@ export default function ChatPage() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "ai",
-          content: "I've received your request. In the final version, this will trigger the agent orchestrator on the backend to execute your goal.",
-        }
-      ]);
-      setIsTyping(false);
-    }, 2000);
+    // Call real API
+    const token = localStorage.getItem("brain_token");
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    
+    fetch(`${apiUrl}/api/brain/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "Bypass-Tunnel-Reminder": "true"
+      },
+      body: JSON.stringify({ message: input })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "ai",
+            content: data.response || "No response received.",
+          }
+        ]);
+      })
+      .catch(err => {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "ai",
+            content: "Error connecting to Brain API: " + err.message,
+          }
+        ]);
+      })
+      .finally(() => {
+        setIsTyping(false);
+      });
   };
 
   return (

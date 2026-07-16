@@ -1,0 +1,2 @@
+web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --forwarded-allow-ips '*'
+worker: celery -A app.worker worker --pool=solo -l info

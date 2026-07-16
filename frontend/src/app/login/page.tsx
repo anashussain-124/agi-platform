@@ -9,18 +9,54 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Simulate API call to backend auth endpoint
-    setTimeout(() => {
-      // In production, this would be an actual API call to /api/auth
-      localStorage.setItem("brain_token", "dummy-jwt-token");
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      // Try to login
+      let res = await fetch(`${apiUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Bypass-Tunnel-Reminder": "true" 
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      // If they don't exist (401), try to register them automatically for convenience
+      if (res.status === 401) {
+        res = await fetch(`${apiUrl}/api/auth/register`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Bypass-Tunnel-Reminder": "true" 
+          },
+          body: JSON.stringify({ email, password, full_name: email.split('@')[0] }),
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Invalid credentials");
+      }
+
+      const data = await res.json();
+      localStorage.setItem("brain_token", data.token);
       router.push("/dashboard");
-    }, 1500);
+      
+    } catch (err: any) {
+      setError(err.message || "Failed to connect to backend");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,8 +87,10 @@ export default function LoginPage() {
                   <User className="w-5 h-5 text-zinc-500" />
                 </div>
                 <input
-                  type="text"
-                  placeholder="Username"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email Address"
                   className="w-full bg-zinc-900/50 border border-zinc-800 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder:text-zinc-600"
                   required
                 />
@@ -64,6 +102,8 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
                   className="w-full bg-zinc-900/50 border border-zinc-800 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder:text-zinc-600"
                   required
@@ -86,7 +126,7 @@ export default function LoginPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Sign In
+                  Sign In / Register
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </>
               )}

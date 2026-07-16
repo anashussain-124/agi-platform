@@ -70,10 +70,10 @@ class MemoryService:
             SELECT id, brain_id, memory_type, importance, title, content, summary,
                    source, source_id, tags, context, access_count, last_accessed_at,
                    created_at, updated_at,
-                   1 - (embedding <=> :query::vector) as similarity
+                   1 - (CAST(embedding AS vector) <=> CAST(:query AS vector)) as similarity
             FROM memory_entries
             WHERE brain_id = :brain_id
-            AND 1 - (embedding <=> :query::vector) > :threshold
+            AND 1 - (CAST(embedding AS vector) <=> CAST(:query AS vector)) > :threshold
         """
         params = {"query": query_embedding, "brain_id": brain_id, "threshold": threshold}
 
@@ -125,11 +125,11 @@ class MemoryService:
         # Find memories with similar embeddings and merge them
         sql = """
             SELECT m1.id as id1, m2.id as id2,
-                   1 - (m1.embedding <=> m2.embedding) as similarity
+                   1 - (CAST(m1.embedding AS vector) <=> CAST(m2.embedding AS vector)) as similarity
             FROM memory_entries m1
             JOIN memory_entries m2 ON m1.id < m2.id
             WHERE m1.brain_id = :brain_id AND m2.brain_id = :brain_id
-            AND 1 - (m1.embedding <=> m2.embedding) > 0.92
+            AND 1 - (m1.embedding::vector <=> m2.embedding::vector) > 0.92
             LIMIT 50
         """
         result = await self.db.execute(text(sql), {"brain_id": brain_id})

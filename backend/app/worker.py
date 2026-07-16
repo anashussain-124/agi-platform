@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.core.config import settings
 from app.agents.orchestrator import AgentOrchestrator
-from app.core.database import SessionLocal
+from app.core.database import AsyncSessionLocal
 from app.services.ai_service import OpenRouterService
 from app.services.memory_service import MemoryService
 
@@ -26,6 +26,16 @@ celery_app.conf.update(
     task_track_started=True,
 )
 
+# Handle SSL Redis URLs (Upstash, etc.)
+if settings.CELERY_BROKER_URL.startswith("rediss://"):
+    celery_app.conf.broker_use_ssl = {
+        "ssl_cert_reqs": "required",
+    }
+if settings.CELERY_RESULT_BACKEND.startswith("rediss://"):
+    celery_app.conf.redis_backend_use_ssl = {
+        "ssl_cert_reqs": "required",
+    }
+
 
 @celery_app.task(name="execute_goal_background")
 def execute_goal_background(brain_id: str, goal: str, context: str = None) -> Dict[str, Any]:
@@ -38,7 +48,7 @@ async def _async_execute_goal(brain_id: str, goal: str, context: str) -> Dict[st
     import uuid
     ai_service = OpenRouterService()
     
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         memory_service = MemoryService(db)
         orchestrator = AgentOrchestrator(
             brain_id=uuid.UUID(brain_id),
@@ -65,7 +75,7 @@ async def _async_process_learning(brain_id: str, conversation_id: str):
     
     ai_service = OpenRouterService()
     
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         # Fetch conversation
         result = await db.execute(
             select(Message)

@@ -145,14 +145,14 @@ class OpenRouterService:
     async def select_model_for_task(self, task_type: str) -> str:
         """Dynamically select the best model for a given task type."""
         model_map = {
-            "reasoning": "anthropic/claude-sonnet-4",
-            "coding": "anthropic/claude-sonnet-4",
-            "writing": "openai/gpt-4o-mini",
-            "analysis": "openai/gpt-4o",
-            "research": "google/gemini-2.0-flash-001",
-            "creative": "anthropic/claude-3.5-haiku",
-            "quick": "openai/gpt-4o-mini",
-            "planning": "anthropic/claude-sonnet-4",
-            "debugging": "openai/gpt-4o",
+            "reasoning": "google/gemma-2-9b-it:free",
+            "coding": "google/gemma-2-9b-it:free",
+            "writing": "meta-llama/llama-3-8b-instruct:free",
+            "analysis": "google/gemma-2-9b-it:free",
+            "research": "google/gemma-2-9b-it:free",
+            "creative": "meta-llama/llama-3-8b-instruct:free",
+            "quick": "meta-llama/llama-3-8b-instruct:free",
+            "planning": "google/gemma-2-9b-it:free",
+            "debugging": "google/gemma-2-9b-it:free",
         }
         return model_map.get(task_type, self.default_model)

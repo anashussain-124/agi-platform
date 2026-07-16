@@ -93,11 +93,11 @@ class RAGService:
 
         sql = """
             SELECT d.title, dc.content, d.content_type, dc.chunk_index,
-                   1 - (dc.embedding <=> :query::vector) as similarity
+                   1 - (CAST(dc.embedding AS vector) <=> CAST(:query AS vector)) as similarity
             FROM document_chunks dc
             JOIN documents d ON d.id = dc.document_id
             WHERE dc.brain_id = :brain_id
-            AND 1 - (dc.embedding <=> :query::vector) > :threshold
+            AND 1 - (CAST(dc.embedding AS vector) <=> CAST(:query AS vector)) > :threshold
             ORDER BY similarity DESC
             LIMIT :limit
         """

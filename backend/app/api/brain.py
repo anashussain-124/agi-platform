@@ -187,7 +187,7 @@ async def _build_chat_context(
 
         # Semantic search for relevant memories
         relevant = await memory_service.search_memories(
-            brain.id, user_message, limit=3, threshold=0.5
+            brain.id, user_message, limit=10, threshold=0.5
         )
         if relevant:
             memory_ctx = "\n".join(
@@ -207,7 +207,7 @@ async def _build_chat_context(
         select(Message)
         .where(Message.conversation_id == conversation.id)
         .order_by(Message.created_at.asc())
-        .limit(20)
+        .limit(50)
     )
     history = result.scalars().all()
     for msg in history:
