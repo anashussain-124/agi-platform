@@ -15,8 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Railway provides the PORT environment variable
-ENV PORT=8000
+# Hugging Face Spaces and Railway provide the PORT environment variable. Default to 7860 for HF.
+ENV PORT=7860
 EXPOSE $PORT
 
 # Start the application
