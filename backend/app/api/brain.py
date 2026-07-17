@@ -1,25 +1,176 @@
-"""Brain API endpoints."""
+"""Brain API endpoints — uses Repository pattern for dual-mode data access."""
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
 import uuid
-import json
+from types import SimpleNamespace
 
 from app.core.database import get_async_session
+from app.core.repository import BaseRepository
+from app.core.compat_models import row_to_obj
 from app.models.user import User
 from app.models.brain import Brain, BrainModule, Conversation, Message
 from app.api.auth import get_current_user
 from app.services.ai_service import OpenRouterService
 from app.services.memory_service import MemoryService
+from app.core.logging import logger
 
 router = APIRouter(prefix="/api/brain", tags=["brain"])
-
-# Shared AI service instance
 ai_service = OpenRouterService()
 
+
+# ──────────────────────────────────────────────────────────
+# Repository
+# ──────────────────────────────────────────────────────────
+
+class BrainRepository(BaseRepository):
+    """Data access for brains, conversations, and messages."""
+
+    async def get_brain_for_user(self, user_id: str) -> Optional[dict | Brain]:
+        if self.use_supabase:
+            rows = await self.supabase.get("brains", filters={"user_id": user_id}, limit=1)
+            return rows[0] if rows else None
+        result = await self.db.execute(select(Brain).where(Brain.user_id == uuid.UUID(user_id)))
+        return result.scalar_one_or_none()
+
+    async def update_brain(self, user_id: str, updates: dict) -> Optional[dict | Brain]:
+        if self.use_supabase:
+            await self.supabase.update("brains", {"user_id": user_id}, updates)
+            rows = await self.supabase.get("brains", filters={"user_id": user_id}, limit=1)
+            return rows[0] if rows else None
+        result = await self.db.execute(select(Brain).where(Brain.user_id == uuid.UUID(user_id)))
+        brain = result.scalar_one_or_none()
+        if brain:
+            for key, value in updates.items():
+                if hasattr(brain, key):
+                    setattr(brain, key, value)
+            await self.db.commit()
+        return brain
+
+    async def create_conversation(self, brain_id: str, title: str) -> dict:
+        if self.use_supabase:
+            return await self.supabase.create("conversations", {
+                "brain_id": brain_id,
+                "title": title,
+            })
+        conv = Conversation(brain_id=uuid.UUID(brain_id), title=title)
+        self.db.add(conv)
+        await self.db.flush()
+        return {"id": str(conv.id), "brain_id": brain_id, "title": title}
+
+    async def create_message(self, conversation_id: str, role: str, content: str) -> dict:
+        if self.use_supabase:
+            return await self.supabase.create("messages", {
+                "conversation_id": conversation_id,
+                "role": role,
+                "content": content,
+            })
+        msg = Message(conversation_id=uuid.UUID(conversation_id), role=role, content=content)
+        self.db.add(msg)
+        await self.db.flush()
+        return {"id": str(msg.id), "role": role, "content": content}
+
+    async def get_messages(self, conversation_id: str, limit: int = 50) -> list[dict]:
+        if self.use_supabase:
+            return await self.supabase.get(
+                "messages",
+                filters={"conversation_id": conversation_id},
+                order="created_at.asc",
+                limit=limit,
+            )
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.conversation_id == uuid.UUID(conversation_id))
+            .order_by(Message.created_at)
+            .limit(limit)
+        )
+        return [
+            {"id": str(m.id), "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+            for m in result.scalars().all()
+        ]
+
+    async def get_conversations(self, brain_id: str, limit: int = 20) -> list[dict]:
+        if self.use_supabase:
+            rows = await self.supabase.get(
+                "conversations",
+                filters={"brain_id": brain_id, "is_archived": False},
+                order="updated_at.desc",
+                limit=limit,
+            )
+            return [
+                {"id": r["id"], "title": r.get("title", "New Conversation"),
+                 "summary": r.get("summary"), "updated_at": r.get("updated_at", "")}
+                for r in rows
+            ]
+        result = await self.db.execute(
+            select(Conversation)
+            .where(Conversation.brain_id == uuid.UUID(brain_id))
+            .where(Conversation.is_archived == False)
+            .order_by(Conversation.updated_at.desc())
+            .limit(limit)
+        )
+        return [
+            {"id": str(c.id), "title": c.title, "summary": c.summary, "updated_at": c.updated_at.isoformat()}
+            for c in result.scalars().all()
+        ]
+
+
+# ──────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────
+
+def _brain_to_dict(brain_data) -> dict:
+    """Normalize brain data (dict or ORM object) to a consistent response dict."""
+    if isinstance(brain_data, dict):
+        return {
+            "id": brain_data.get("id", ""),
+            "name": brain_data.get("name", ""),
+            "status": brain_data.get("status", "active"),
+            "stats": {
+                "total_conversations": brain_data.get("total_conversations", 0),
+                "total_memories": brain_data.get("total_memories", 0),
+                "total_tasks": brain_data.get("total_tasks", 0),
+                "uptime_hours": float(brain_data.get("uptime_hours", 0)),
+            },
+            "preferences": brain_data.get("preferences", {}) or {},
+            "settings": {
+                "auto_learn": brain_data.get("auto_learn", True),
+                "auto_index": brain_data.get("auto_index", True),
+                "require_approval_deploy": brain_data.get("require_approval_deploy", True),
+                "require_approval_write": brain_data.get("require_approval_write", False),
+            },
+            "last_active_at": brain_data.get("last_active_at"),
+            "created_at": brain_data.get("created_at", ""),
+        }
+
+    # SQLAlchemy ORM object
+    return {
+        "id": str(brain_data.id),
+        "name": brain_data.name,
+        "status": brain_data.status.value if hasattr(brain_data.status, "value") else brain_data.status,
+        "stats": {
+            "total_conversations": brain_data.total_conversations,
+            "total_memories": brain_data.total_memories,
+            "total_tasks": brain_data.total_tasks,
+            "uptime_hours": brain_data.uptime_hours,
+        },
+        "preferences": brain_data.preferences or {},
+        "settings": {
+            "auto_learn": brain_data.auto_learn,
+            "auto_index": brain_data.auto_index,
+            "require_approval_deploy": brain_data.require_approval_deploy,
+            "require_approval_write": brain_data.require_approval_write,
+        },
+        "last_active_at": brain_data.last_active_at.isoformat() if brain_data.last_active_at else None,
+        "created_at": brain_data.created_at.isoformat(),
+    }
+
+
+# ──────────────────────────────────────────────────────────
+# Routes
+# ──────────────────────────────────────────────────────────
 
 @router.get("/")
 async def get_brain(
@@ -27,32 +178,11 @@ async def get_brain(
     db: AsyncSession = Depends(get_async_session),
 ):
     """Get the current user's Brain."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
-
+    repo = BrainRepository(db)
+    brain = await repo.get_brain_for_user(str(user.id))
     if not brain:
         raise HTTPException(status_code=404, detail="Brain not found. Create one first.")
-
-    return {
-        "id": str(brain.id),
-        "name": brain.name,
-        "status": brain.status.value,
-        "stats": {
-            "total_conversations": brain.total_conversations,
-            "total_memories": brain.total_memories,
-            "total_tasks": brain.total_tasks,
-            "uptime_hours": brain.uptime_hours,
-        },
-        "preferences": brain.preferences or {},
-        "settings": {
-            "auto_learn": brain.auto_learn,
-            "auto_index": brain.auto_index,
-            "require_approval_deploy": brain.require_approval_deploy,
-            "require_approval_write": brain.require_approval_write,
-        },
-        "last_active_at": brain.last_active_at.isoformat() if brain.last_active_at else None,
-        "created_at": brain.created_at.isoformat(),
-    }
+    return _brain_to_dict(brain)
 
 
 @router.patch("/")
@@ -63,161 +193,32 @@ async def update_brain(
     db: AsyncSession = Depends(get_async_session),
 ):
     """Update Brain settings."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
+    updates = {}
+    if name is not None:
+        updates["name"] = name
+    if preferences is not None:
+        updates["preferences"] = preferences
 
+    repo = BrainRepository(db)
+    brain = await repo.update_brain(str(user.id), updates)
     if not brain:
         raise HTTPException(status_code=404, detail="Brain not found")
-
-    if name:
-        brain.name = name
-    if preferences:
-        if brain.preferences:
-            brain.preferences.update(preferences)
-        else:
-            brain.preferences = preferences
-
-    return {"status": "updated", "name": brain.name}
+    return _brain_to_dict(brain)
 
 
-@router.get("/modules")
-async def get_modules(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session),
-):
-    """Get installed Brain modules."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
-    if not brain:
-        raise HTTPException(status_code=404)
-
-    result = await db.execute(
-        select(BrainModule).where(BrainModule.brain_id == brain.id)
-    )
-    modules = result.scalars().all()
-
-    return [
-        {
-            "id": str(m.id),
-            "name": m.name,
-            "module_type": m.module_type,
-            "enabled": m.enabled,
-            "config": m.config,
-        }
-        for m in modules
-    ]
-
-
-@router.get("/conversations")
-async def list_conversations(
-    limit: int = 20,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session),
-):
-    """List recent conversations."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
-    if not brain:
-        raise HTTPException(status_code=404)
-
-    result = await db.execute(
-        select(Conversation)
-        .where(Conversation.brain_id == brain.id, Conversation.is_archived == False)
-        .order_by(Conversation.updated_at.desc())
-        .limit(limit)
-    )
-    conversations = result.scalars().all()
-
-    return [
-        {
-            "id": str(c.id),
-            "title": c.title,
-            "summary": c.summary,
-            "token_count": c.token_count,
-            "created_at": c.created_at.isoformat(),
-            "updated_at": c.updated_at.isoformat(),
-        }
-        for c in conversations
-    ]
-
+# ──────────────────────────────────────────────────────────
+# Chat
+# ──────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
 
 
-async def _build_chat_context(
-    brain: Brain,
-    conversation: Conversation,
-    user_message: str,
-    db: AsyncSession,
-) -> list[dict]:
-    """Build the full message context for the AI, including memory retrieval."""
-    messages = []
-
-    # 1. System prompt with brain personality
-    system_prompt = (
-        f"You are {brain.name}, a personal AI brain. "
-        "You help your user reason, remember, plan, and build. "
-        "You have access to persistent memory, specialized agents, and can learn preferences over time. "
-        "Be helpful, precise, and proactive. If the user asks you to remember something, confirm it. "
-        "Keep responses concise unless asked to elaborate."
-    )
-
-    # Add communication style preference
-    if brain.communication_style:
-        style_map = {
-            "concise": "Keep responses very brief and to the point.",
-            "balanced": "Provide helpful detail without being verbose.",
-            "detailed": "Provide thorough, detailed responses.",
-        }
-        system_prompt += f"\n\nCommunication style: {style_map.get(brain.communication_style, '')}"
-
-    messages.append({"role": "system", "content": system_prompt})
-
-    # 2. Retrieve relevant memories for context
-    try:
-        memory_service = MemoryService(db)
-        working_ctx = await memory_service.get_working_context(brain.id)
-        if working_ctx and working_ctx != "No active working memory.":
-            messages.append({
-                "role": "system",
-                "content": f"Current working memory:\n{working_ctx}",
-            })
-
-        # Semantic search for relevant memories
-        relevant = await memory_service.search_memories(
-            brain.id, user_message, limit=10, threshold=0.5
-        )
-        if relevant:
-            memory_ctx = "\n".join(
-                f"- [{m.memory_type.value}] {m.title}: {m.content[:300]}"
-                for m in relevant
-            )
-            messages.append({
-                "role": "system",
-                "content": f"Relevant memories:\n{memory_ctx}",
-            })
-    except Exception:
-        # Memory retrieval is best-effort; don't fail the chat
-        pass
-
-    # 3. Load recent conversation history
-    result = await db.execute(
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at.asc())
-        .limit(50)
-    )
-    history = result.scalars().all()
-    for msg in history:
-        if msg.role in ("user", "assistant"):
-            messages.append({"role": msg.role, "content": msg.content})
-
-    # 4. Add the new user message
-    messages.append({"role": "user", "content": user_message})
-
-    return messages
+class ChatResponse(BaseModel):
+    conversation_id: str
+    response: str
+    brain_status: Optional[str] = None
 
 
 @router.post("/chat")
@@ -226,219 +227,80 @@ async def chat(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    """Send a message to your Brain."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
-    if not brain:
-        raise HTTPException(status_code=404, detail="Brain not found")
-
-    # Get or create conversation
-    conv_id = uuid.UUID(req.conversation_id) if req.conversation_id else uuid.uuid4()
-    if not req.conversation_id:
-        conv = Conversation(
-            id=conv_id,
-            brain_id=brain.id,
-            title=req.message[:50] + ("..." if len(req.message) > 50 else ""),
-        )
-        db.add(conv)
-        brain.total_conversations += 1
-    else:
-        result = await db.execute(
-            select(Conversation).where(Conversation.id == conv_id)
-        )
-        conv = result.scalar_one_or_none()
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Store user message
-    user_msg = Message(
-        conversation_id=conv.id,
-        role="user",
-        content=req.message,
-    )
-    db.add(user_msg)
-    await db.flush()
-
-    # Build context and call AI
-    chat_messages = await _build_chat_context(brain, conv, req.message, db)
-
+    """Send a message to the Brain and get a response."""
     try:
-        ai_response = await ai_service.chat(
-            messages=chat_messages,
-            temperature=0.7,
-            max_tokens=4096,
+        repo = BrainRepository(db)
+        brain = await repo.get_brain_for_user(str(user.id))
+        if not brain:
+            raise HTTPException(status_code=404, detail="Brain not found")
+
+        brain_id = brain["id"] if isinstance(brain, dict) else str(brain.id)
+        brain_status = brain.get("status", "active") if isinstance(brain, dict) else brain.status.value
+
+        # Conversation lookup or create
+        conv_id = req.conversation_id
+        if not conv_id:
+            conv = await repo.create_conversation(brain_id, req.message[:50])
+            conv_id = conv["id"]
+
+        # Save user message
+        await repo.create_message(conv_id, "user", req.message)
+
+        # Build message history
+        msgs = await repo.get_messages(conv_id, limit=50)
+        history = [{"role": m["role"], "content": m["content"]} for m in msgs]
+
+        # Get AI response
+        try:
+            ai_result = await ai_service.chat(history)
+            ai_text = ai_result["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error("AI service error: %s", str(e)[:200])
+            ai_text = (
+                f"I encountered an issue connecting to the AI service: {e}\n\n"
+                "Make sure OPENROUTER_API_KEY is set in your .env file."
+            )
+
+        # Save AI response
+        await repo.create_message(conv_id, "assistant", ai_text)
+
+        return ChatResponse(
+            conversation_id=conv_id,
+            response=ai_text,
+            brain_status=brain_status,
         )
-        response_text = ai_response["choices"][0]["message"]["content"]
+    except HTTPException:
+        raise
     except Exception as e:
-        response_text = (
-            f"I encountered an issue connecting to the AI service: {str(e)}\n\n"
-            "Make sure OPENROUTER_API_KEY is set in your .env file."
-        )
-
-    # Store assistant response
-    assistant_msg = Message(
-        conversation_id=conv.id,
-        role="assistant",
-        content=response_text,
-    )
-    db.add(assistant_msg)
-
-    # Auto-learn: if the user asks to remember something, store it as a memory
-    if brain.auto_learn:
-        lower_msg = req.message.lower()
-        if any(kw in lower_msg for kw in ["remember", "note that", "keep in mind", "save this"]):
-            try:
-                from app.models.memory import MemoryType, MemoryImportance
-                memory_service = MemoryService(db)
-                await memory_service.store_memory(
-                    brain_id=brain.id,
-                    memory_type=MemoryType.SEMANTIC,
-                    title=f"User note: {req.message[:80]}",
-                    content=req.message,
-                    importance=MemoryImportance.MEDIUM,
-                    source="conversation",
-                    source_id=str(conv.id),
-                )
-                brain.total_memories += 1
-            except Exception:
-                pass  # Best-effort auto-learn
-
-    return {
-        "conversation_id": str(conv.id),
-        "response": response_text,
-        "brain_status": brain.status.value,
-    }
+        logger.error("Chat error: %s", str(e)[:300])
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
 
 
-@router.post("/chat/stream")
-async def chat_stream(
-    req: ChatRequest,
+@router.get("/conversations")
+async def get_conversations(
+    limit: int = 20,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    """Stream a chat response from your Brain via Server-Sent Events."""
-    result = await db.execute(select(Brain).where(Brain.user_id == user.id))
-    brain = result.scalar_one_or_none()
+    """Get recent conversations."""
+    repo = BrainRepository(db)
+    brain = await repo.get_brain_for_user(str(user.id))
     if not brain:
-        raise HTTPException(status_code=404, detail="Brain not found")
-
-    # Get or create conversation
-    conv_id = uuid.UUID(req.conversation_id) if req.conversation_id else uuid.uuid4()
-    if not req.conversation_id:
-        conv = Conversation(
-            id=conv_id,
-            brain_id=brain.id,
-            title=req.message[:50] + ("..." if len(req.message) > 50 else ""),
-        )
-        db.add(conv)
-        brain.total_conversations += 1
-    else:
-        result = await db.execute(
-            select(Conversation).where(Conversation.id == conv_id)
-        )
-        conv = result.scalar_one_or_none()
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Store user message
-    user_msg = Message(conversation_id=conv.id, role="user", content=req.message)
-    db.add(user_msg)
-    await db.flush()
-
-    chat_messages = await _build_chat_context(brain, conv, req.message, db)
-
-    async def event_generator():
-        full_response = ""
-        try:
-            # Send conversation_id first
-            yield f"data: {json.dumps({'type': 'meta', 'conversation_id': str(conv.id)})}\n\n"
-
-            if not ai_service.api_key:
-                content = (
-                    "Brain AGI is running in development mode. "
-                    "Configure OPENROUTER_API_KEY to enable AI responses."
-                )
-                yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
-                full_response = content
-            else:
-                import httpx
-                async with httpx.AsyncClient(timeout=120) as client:
-                    async with client.stream(
-                        "POST",
-                        f"{ai_service.base_url}/chat/completions",
-                        headers=ai_service._headers(),
-                        json={
-                            "model": ai_service.default_model,
-                            "messages": chat_messages,
-                            "temperature": 0.7,
-                            "max_tokens": 4096,
-                            "stream": True,
-                        },
-                    ) as response:
-                        async for line in response.aiter_lines():
-                            if line.startswith("data: "):
-                                data = line[6:]
-                                if data == "[DONE]":
-                                    break
-                                try:
-                                    chunk = json.loads(data)
-                                    delta = chunk.get("choices", [{}])[0].get("delta", {})
-                                    content = delta.get("content", "")
-                                    if content:
-                                        full_response += content
-                                        yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
-                                except json.JSONDecodeError:
-                                    pass
-
-            # Store complete response
-            assistant_msg = Message(
-                conversation_id=conv.id,
-                role="assistant",
-                content=full_response,
-            )
-            db.add(assistant_msg)
-            await db.commit()
-
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
-        except Exception as e:
-            error_msg = f"Stream error: {str(e)}"
-            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+        return []
+    brain_id = brain["id"] if isinstance(brain, dict) else str(brain.id)
+    return await repo.get_conversations(brain_id, limit)
 
 
 @router.get("/conversations/{conversation_id}/messages")
 async def get_messages(
     conversation_id: str,
-    limit: int = 50,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    """Get messages from a conversation."""
-    conv_uuid = uuid.UUID(conversation_id)
-    result = await db.execute(
-        select(Message)
-        .where(Message.conversation_id == conv_uuid)
-        .order_by(Message.created_at.asc())
-        .limit(limit)
-    )
-    messages = result.scalars().all()
-
+    """Get messages for a conversation."""
+    repo = BrainRepository(db)
+    messages = await repo.get_messages(conversation_id, limit=200)
     return [
-        {
-            "id": str(m.id),
-            "role": m.role,
-            "content": m.content,
-            "created_at": m.created_at.isoformat(),
-        }
+        {"id": m.get("id", ""), "role": m["role"], "content": m["content"], "created_at": m.get("created_at", "")}
         for m in messages
     ]

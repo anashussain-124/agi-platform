@@ -53,11 +53,17 @@ export default function AppLayout({
   const isFullHeightRoute = pathname === "/chat";
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-zinc-950 bg-grid relative overflow-hidden">
+      {/* Background glowing orbs */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[var(--glow-violet)] blur-[120px]" />
+        <div className="absolute bottom-[10%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[var(--glow-teal)] blur-[120px]" />
+      </div>
+
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -66,28 +72,30 @@ export default function AppLayout({
       <aside
         className={`
           fixed md:static inset-y-0 left-0 z-50 w-64
-          bg-zinc-900 border-r border-zinc-800
-          transform transition-transform duration-200 ease-in-out
+          glass border-r border-zinc-800/50
+          transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0
           flex flex-col
         `}
       >
         {/* Logo */}
-        <div className="p-4 border-b border-zinc-800">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-teal-500 flex items-center justify-center">
-              <Brain className="w-5 h-5 text-white" />
+        <div className="p-6 border-b border-zinc-800/50">
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-[var(--gradient-primary)] p-[1px] shadow-[var(--shadow-glow)] transition-transform duration-300 group-hover:scale-105">
+              <div className="w-full h-full bg-zinc-950 rounded-[11px] flex items-center justify-center">
+                <Brain className="w-5 h-5 text-violet-400 brain-glow" />
+              </div>
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-zinc-100">Brain AGI</h1>
-              <p className="text-xs text-zinc-500">Your AI Platform</p>
+              <h1 className="text-base font-semibold text-zinc-100 tracking-tight">Brain AGI</h1>
+              <p className="text-xs text-zinc-500 font-medium">Platform</p>
             </div>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -97,15 +105,15 @@ export default function AppLayout({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
                   ${
                     isActive
-                      ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                      ? "bg-violet-500/15 text-violet-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-violet-500/20"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 hover:shadow-sm"
                   }
                 `}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? "text-violet-400" : ""}`} />
                 {item.label}
               </Link>
             );
@@ -113,10 +121,10 @@ export default function AppLayout({
         </nav>
 
         {/* Logout */}
-        <div className="p-3 border-t border-zinc-800">
+        <div className="p-4 border-t border-zinc-800/50">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-800 w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-400 hover:text-red-400 hover:bg-red-500/10 w-full transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -125,25 +133,27 @@ export default function AppLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 z-10 relative">
         {/* Mobile header */}
-        <header className="md:hidden flex items-center gap-3 p-3 border-b border-zinc-800 bg-zinc-900">
+        <header className="md:hidden flex items-center gap-3 p-4 glass border-b border-zinc-800/50 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"
+            className="p-2 rounded-xl hover:bg-zinc-800/50 text-zinc-400 transition-colors"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-teal-500 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--gradient-primary)] p-[1px]">
+              <div className="w-full h-full bg-zinc-950 rounded-[7px] flex items-center justify-center">
+                <Brain className="w-4 h-4 text-violet-400" />
+              </div>
             </div>
-            <span className="text-sm font-medium">Brain AGI</span>
+            <span className="text-sm font-semibold tracking-tight">Brain AGI</span>
           </div>
         </header>
 
-        {/* Page content — full height for chat, padded for others */}
-        <div className={`flex-1 overflow-y-auto ${isFullHeightRoute ? "p-0" : "p-4 md:p-6"}`}>
+        {/* Page content */}
+        <div className={`flex-1 overflow-y-auto ${isFullHeightRoute ? "p-0" : "p-4 md:p-8"}`}>
           {children}
         </div>
       </main>

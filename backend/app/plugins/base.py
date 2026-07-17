@@ -4,6 +4,8 @@ from pydantic import BaseModel
 import inspect
 
 class PluginAction(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     name: str
     description: str
     schema: Dict[str, Any]

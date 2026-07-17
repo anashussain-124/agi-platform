@@ -1,21 +1,55 @@
-"""Database engine and session management."""
+"""Database engine and session management.
+Supports PostgreSQL (production) and SQLite (local/dev).
+PostgreSQL: DATABASE_URL env var required. SSL auto-enabled for Supabase.
+SQLite: Default fallback when DATABASE_URL is not set.
+"""
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import create_engine, text
-
 from app.core.config import settings
 
-async_engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
-sync_engine = create_engine(settings.DATABASE_URL_SYNC, echo=settings.DEBUG)
 
-AsyncSessionLocal = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+def _build_async_url() -> str:
+    """Prepare the async database URL with appropriate SSL settings."""
+    url = settings.DATABASE_URL
+    is_supabase = "supabase.co" in url or "pooler.supabase.com" in url
+    if is_supabase and "ssl" not in url.lower() and "sslmode" not in url.lower():
+        sep = "&" if "?" in url else "?"
+        url += f"{sep}ssl=require"
+    return url
+
+
+def _build_connect_args() -> dict:
+    """Connection args for async engine — disables prepared stmt cache for Supabase pooler."""
+    if "pooler.supabase.com" in settings.DATABASE_URL:
+        return {"prepared_statement_cache_size": 0, "statement_cache_size": 0}
+    return {}
+
+
+async_engine = create_async_engine(
+    _build_async_url(),
+    echo=settings.DEBUG,
+    connect_args=_build_connect_args(),
+)
+
+# Sync engine for alembic / local scripts — only created if a sync URL is configured
+sync_engine = (
+    create_engine(settings.DATABASE_URL_SYNC, echo=settings.DEBUG)
+    if settings.DATABASE_URL_SYNC
+    else None
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    async_engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 class Base(DeclarativeBase):
     pass
 
 
-async def get_async_session() -> AsyncSession:
+async def get_async_session() -> AsyncSession:  # type: ignore[misc]
+    """Dependency: yields a committed async DB session, rolls back on error."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -25,14 +59,36 @@ async def get_async_session() -> AsyncSession:
             raise
 
 
-async def init_db():
-    """Create all tables."""
+async def init_db() -> None:
+    """Create all tables defined by models that inherit from Base."""
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def check_pgvector():
-    """Verify pgvector extension is available."""
+async def check_pgvector() -> bool:
+    """Return True if the 'vector' PG extension is available."""
     async with AsyncSessionLocal() as session:
-        result = await session.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
+        result = await session.execute(
+            text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+        )
         return result.scalar() is not None
+
+
+async def check_connection() -> dict:
+    """Return a dict describing the database connection status. Safe for API exposure."""
+    import time
+
+    result = {"type": "sqlite" if "sqlite" in settings.DATABASE_URL else "postgres"}
+    result["url_prefix"] = settings.DATABASE_URL[:25] + "..."
+    try:
+        t0 = time.time()
+        async with AsyncSessionLocal() as session:
+            row = await session.execute(text("SELECT 1 AS ok"))
+            val = row.fetchone()
+            result["status"] = "connected"
+            result["latency_ms"] = round((time.time() - t0) * 1000)
+            result["detail"] = dict(val._mapping) if val else None
+    except Exception as exc:
+        result["status"] = "error"
+        result["detail"] = str(exc)[:200]
+    return result

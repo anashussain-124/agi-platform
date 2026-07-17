@@ -17,6 +17,15 @@
   --accent-foreground: #09090b;
   --border: #27272a;
   --ring: #a78bfa;
+
+  /* Extended design system */
+  --glow-violet: rgba(167, 139, 250, 0.15);
+  --glow-teal: rgba(45, 212, 191, 0.15);
+  --glow-blue: rgba(96, 165, 250, 0.15);
+  --gradient-primary: linear-gradient(135deg, #a78bfa 0%, #2dd4bf 100%);
+  --gradient-card: linear-gradient(135deg, rgba(167, 139, 250, 0.05) 0%, rgba(45, 212, 191, 0.05) 100%);
+  --shadow-glow: 0 0 20px rgba(167, 139, 250, 0.1), 0 0 60px rgba(167, 139, 250, 0.05);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 * {
@@ -29,12 +38,13 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Brain-themed scrollbar */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #18181b;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #3f3f46;
@@ -44,12 +54,12 @@ body {
   background: #52525b;
 }
 
-/* Neural network animation */
+/* ─── Animations ─── */
+
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
 }
-
 .brain-glow {
   animation: pulse-glow 3s ease-in-out infinite;
 }
@@ -58,15 +68,116 @@ body {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
 }
-
 .float-animation {
   animation: float 6s ease-in-out infinite;
 }
 
-/* Grid pattern background */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #27272a 25%,
+    #3f3f46 37%,
+    #27272a 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* ─── Glassmorphism utility ─── */
+.glass {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(63, 63, 70, 0.3);
+}
+.glass-strong {
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+}
+
+/* ─── Card effects ─── */
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  border-color: #52525b;
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.card-gradient {
+  position: relative;
+  overflow: hidden;
+}
+.card-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-card);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.card-gradient:hover::before {
+  opacity: 1;
+}
+
+/* ─── Grid pattern background ─── */
 .bg-grid {
-  background-image: 
+  background-image:
     linear-gradient(rgba(167, 139, 250, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(167, 139, 250, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
+}
+
+/* ─── Status indicators ─── */
+.status-pulse {
+  position: relative;
+}
+.status-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  animation: pulse-glow 2s ease-in-out infinite;
 }

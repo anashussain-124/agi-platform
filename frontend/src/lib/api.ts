@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// In production (no NEXT_PUBLIC_API_URL), use same-origin proxy via vercel.json rewrite.
+// In development, set NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.local.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function request<T>(
   endpoint: string,
@@ -21,6 +23,13 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      // Auto-logout on 401 Unauthorized
+      localStorage.removeItem("brain_token");
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail || `API error: ${res.status}`);
   }

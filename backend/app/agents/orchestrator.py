@@ -4,7 +4,10 @@ Coordinates specialized AI agents for different tasks."""
 from typing import Optional, List, Dict, Any
 from enum import Enum
 import uuid
+import json
 from datetime import datetime, timezone
+
+from app.core.logging import logger
 
 
 class AgentType(str, Enum):
@@ -83,109 +86,10 @@ class AgentOrchestrator:
         self._register_default_agents()
 
     def _register_default_agents(self):
-        """Create the default set of specialized agents."""
-        agents_config = [
-            Agent(
-                agent_type=AgentType.DEVELOPER,
-                name="Developer Agent",
-                description="Writes, debugs, and refactors code. Handles implementation tasks.",
-                capabilities=[
-                    AgentCapability("code_generation", "Write new code", ["read", "write", "search", "git"]),
-                    AgentCapability("debugging", "Find and fix bugs", ["read", "search", "execute"]),
-                    AgentCapability("refactoring", "Improve existing code", ["read", "write", "search"]),
-                ],
-                system_prompt="You are an expert software developer. Write clean, well-tested code.",
-            ),
-            Agent(
-                agent_type=AgentType.RESEARCHER,
-                name="Research Agent",
-                description="Searches documentation, papers, and APIs for information.",
-                capabilities=[
-                    AgentCapability("web_search", "Search the web", ["web_search"]),
-                    AgentCapability("document_analysis", "Analyze documents", ["read", "search"]),
-                    AgentCapability("api_research", "Research APIs", ["web_search", "read"]),
-                ],
-                system_prompt="You are a research assistant. Find accurate, relevant information.",
-            ),
-            Agent(
-                agent_type=AgentType.SECURITY,
-                name="Security Agent",
-                description="Scans for vulnerabilities, secrets, and security issues.",
-                capabilities=[
-                    AgentCapability("vulnerability_scan", "Find vulnerabilities", ["read", "search"]),
-                    AgentCapability("secret_detection", "Find exposed secrets", ["search"]),
-                    AgentCapability("dependency_review", "Check dependencies", ["read", "execute"]),
-                ],
-                system_prompt="You are a security expert. Identify vulnerabilities and suggest fixes.",
-            ),
-            Agent(
-                agent_type=AgentType.QA,
-                name="QA Agent",
-                description="Generates tests and runs regression checks.",
-                capabilities=[
-                    AgentCapability("test_generation", "Write tests", ["read", "write"]),
-                    AgentCapability("regression", "Run regression checks", ["execute"]),
-                ],
-                system_prompt="You are a QA engineer. Write thorough tests.",
-            ),
-            Agent(
-                agent_type=AgentType.PROJECT_MANAGER,
-                name="Project Manager Agent",
-                description="Creates roadmaps, tracks progress, and allocates tasks.",
-                capabilities=[
-                    AgentCapability("planning", "Create plans", ["read", "write"]),
-                    AgentCapability("tracking", "Track progress", ["read"]),
-                    AgentCapability("reporting", "Generate reports", ["read", "write"]),
-                ],
-                system_prompt="You are a project manager. Break down goals into actionable tasks.",
-            ),
-            Agent(
-                agent_type=AgentType.DOCUMENTATION,
-                name="Documentation Agent",
-                description="Creates and maintains documentation.",
-                capabilities=[
-                    AgentCapability("readme", "Create READMEs", ["read", "write"]),
-                    AgentCapability("docs", "Write documentation", ["read", "write", "search"]),
-                    AgentCapability("changelog", "Generate changelogs", ["read", "write"]),
-                ],
-                system_prompt="You are a technical writer. Create clear, comprehensive documentation.",
-            ),
-            Agent(
-                agent_type=AgentType.INFRASTRUCTURE,
-                name="Infrastructure Agent",
-                description="Handles deployments, monitoring, and CI/CD.",
-                capabilities=[
-                    AgentCapability("deployment", "Deploy applications", ["execute", "read"]),
-                    AgentCapability("monitoring", "Monitor systems", ["read", "execute"]),
-                    AgentCapability("ci_cd", "Manage CI/CD", ["read", "write", "execute"]),
-                ],
-                system_prompt="You are a DevOps engineer. Manage infrastructure reliably.",
-            ),
-            Agent(
-                agent_type=AgentType.BUSINESS,
-                name="Business Agent",
-                description="Analyzes analytics, revenue, and growth.",
-                capabilities=[
-                    AgentCapability("analytics", "Analyze metrics", ["read", "execute"]),
-                    AgentCapability("reporting", "Business reports", ["read", "write"]),
-                    AgentCapability("strategy", "Strategic advice", ["read", "web_search"]),
-                ],
-                system_prompt="You are a business analyst. Provide data-driven insights.",
-            ),
-            Agent(
-                agent_type=AgentType.MARKETING,
-                name="Marketing Agent",
-                description="SEO, content ideas, and social media.",
-                capabilities=[
-                    AgentCapability("seo", "SEO analysis", ["web_search", "read"]),
-                    AgentCapability("content", "Content creation", ["write"]),
-                    AgentCapability("social_media", "Social media", ["write"]),
-                ],
-                system_prompt="You are a marketing specialist. Drive growth through content and SEO.",
-            ),
-        ]
+        """Load agents from the extracted config module."""
+        from app.agents.agent_config import get_default_agents
 
-        for agent in agents_config:
+        for agent in get_default_agents():
             self.agents[agent.agent_type.value] = agent
 
     def get_agent(self, agent_type: AgentType) -> Optional[Agent]:
@@ -196,25 +100,9 @@ class AgentOrchestrator:
 
     def select_agent_for_task(self, task_type: str) -> Optional[Agent]:
         """Intelligently select the best agent for a task."""
-        type_map = {
-            "coding": AgentType.DEVELOPER,
-            "debug": AgentType.DEVELOPER,
-            "refactor": AgentType.DEVELOPER,
-            "implement": AgentType.DEVELOPER,
-            "research": AgentType.RESEARCHER,
-            "documentation": AgentType.DOCUMENTATION,
-            "security": AgentType.SECURITY,
-            "test": AgentType.QA,
-            "deploy": AgentType.INFRASTRUCTURE,
-            "infrastructure": AgentType.INFRASTRUCTURE,
-            "business": AgentType.BUSINESS,
-            "analytics": AgentType.BUSINESS,
-            "marketing": AgentType.MARKETING,
-            "plan": AgentType.PROJECT_MANAGER,
-            "design": AgentType.DESIGNER,
-        }
+        from app.agents.agent_config import TASK_TYPE_MAP
 
-        agent_type = type_map.get(task_type, AgentType.ORCHESTRATOR)
+        agent_type = TASK_TYPE_MAP.get(task_type, AgentType.ORCHESTRATOR)
         return self.agents.get(agent_type.value)
 
     async def delegate_to_agent(
@@ -232,6 +120,8 @@ class AgentOrchestrator:
             return {"error": f"Agent {agent.name} is busy"}
 
         agent.is_busy = True
+        logger.info("Delegating task to %s: %s", agent.name, task[:80])
+
         try:
             # Build the prompt
             messages = [
@@ -251,20 +141,22 @@ class AgentOrchestrator:
             if self.ai_service:
                 # Dynamically route to the best model for the task
                 model = self.ai_service.route_task(task, requires_tools=len(tools) > 0)
-                
-                # Override with agent preference if it exists and we didn't specifically route to reasoning/agent
+
+                # Override with agent preference if it exists and we didn't specifically route
                 if agent.capabilities and model == self.ai_service.default_model:
-                     model = agent.capabilities[0].model_preference
-                     
+                    model = agent.capabilities[0].model_preference
+
                 response = await self.ai_service.chat(messages=messages, model=model)
                 result = response["choices"][0]["message"]["content"]
             else:
                 result = f"[{agent.name} would process: {task[:100]}...]"
 
             agent.tasks_completed += 1
+            logger.info("Agent %s completed task successfully", agent.name)
             return {"agent": agent.name, "result": result, "success": True}
 
         except Exception as e:
+            logger.error("Agent %s failed: %s", agent.name, str(e)[:200])
             return {"agent": agent.name, "error": str(e), "success": False}
         finally:
             agent.is_busy = False
@@ -276,8 +168,10 @@ class AgentOrchestrator:
         context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Break down a goal and coordinate multiple agents to achieve it."""
-        import json
-        
+        from app.agents.agent_config import AGENT_TYPE_MAP
+
+        logger.info("Orchestrating goal: %s", goal[:100])
+
         # 1. PM agent creates the plan as a JSON array of tasks
         pm_prompt = (
             f"Break down this goal into actionable steps.\nGoal: {goal}\n\n"
@@ -300,44 +194,35 @@ class AgentOrchestrator:
                 clean_text = clean_text[3:]
             if clean_text.endswith("```"):
                 clean_text = clean_text[:-3]
-                
+
             tasks = json.loads(clean_text.strip())
         except json.JSONDecodeError:
-            # Fallback if AI didn't return valid JSON
+            logger.warning("Failed to parse plan JSON for goal: %s", goal[:50])
             return {
                 "goal": goal,
                 "plan": plan_text,
                 "error": "Failed to parse plan into JSON tasks.",
-                "subtasks": []
+                "subtasks": [],
             }
 
         # 3. Execute tasks with appropriate agents
-        results = {
+        results: Dict[str, Any] = {
             "goal": goal,
             "plan": tasks,
             "subtasks": [],
         }
 
-        # Map string agent names back to enum
-        agent_map = {
-            "Developer Agent": AgentType.DEVELOPER,
-            "Research Agent": AgentType.RESEARCHER,
-            "Security Agent": AgentType.SECURITY,
-            "QA Agent": AgentType.QA,
-            "Project Manager": AgentType.PROJECT_MANAGER,
-        }
-
         for i, step in enumerate(tasks):
             agent_str = step.get("agent", "Developer Agent")
             task_desc = step.get("task", "")
-            
+
             # Find the best agent type, default to developer
-            agent_type = agent_map.get(agent_str, AgentType.DEVELOPER)
-            
-            # 1. Generate (Execute subtask)
+            agent_type = AGENT_TYPE_MAP.get(agent_str, AgentType.DEVELOPER)
+
+            # Execute subtask
             step_result = await self.delegate_to_agent(agent_type, task_desc)
-            
-            # 2. QA Review / Fact Check
+
+            # QA Review
             review_prompt = (
                 f"Review the following output for the task: '{task_desc}'.\n"
                 f"Check for accuracy, completeness, and potential issues.\n\n"
@@ -347,14 +232,15 @@ class AgentOrchestrator:
             )
             review_result = await self.delegate_to_agent(AgentType.QA, review_prompt)
             review_text = review_result.get("result", "")
-            
+
             results["subtasks"].append({
                 "step": i + 1,
                 "assigned_to": agent_str,
                 "task": task_desc,
                 "outcome": step_result,
                 "qa_review": review_text,
-                "status": "approved" if "APPROVED" in review_text else "rejected_or_warned"
+                "status": "approved" if "APPROVED" in review_text else "rejected_or_warned",
             })
 
+        logger.info("Goal orchestration complete: %d subtasks", len(results["subtasks"]))
         return results

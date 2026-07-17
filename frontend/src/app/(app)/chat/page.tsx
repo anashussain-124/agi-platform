@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Brain, User, Loader2, Paperclip, MoreVertical } from "lucide-react";
-import { motion } from "framer-motion";
+import { Send, Brain, User, Loader2, Paperclip, MoreVertical, LayoutPanelLeft } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/lib/api";
+import { showToast } from "@/components/ui/toast";
 
 interface Message {
   id: string;
@@ -30,143 +32,151 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const newMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+    const userMessage = input;
+    const newMsg: Message = { id: Date.now().toString(), role: "user", content: userMessage };
+    
     setMessages(prev => [...prev, newMsg]);
     setInput("");
     setIsTyping(true);
 
-    // Call real API
-    const token = localStorage.getItem("brain_token");
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    
-    fetch(`${apiUrl}/api/brain/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "Bypass-Tunnel-Reminder": "true"
-      },
-      body: JSON.stringify({ message: input })
-    })
-      .then(res => res.json())
-      .then(data => {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "ai",
-            content: data.response || "No response received.",
-          }
-        ]);
-      })
-      .catch(err => {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "ai",
-            content: "Error connecting to Brain API: " + err.message,
-          }
-        ]);
-      })
-      .finally(() => {
-        setIsTyping(false);
-      });
+    try {
+      const data = await api.chat(userMessage);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "ai",
+          content: data.response || "No response received.",
+        }
+      ]);
+    } catch (err: any) {
+      showToast(err.message || "Failed to connect to Brain API", "error");
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "ai",
+          content: "Error connecting to Brain API: " + err.message,
+        }
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-2rem)]">
-      {/* Chat Header */}
-      <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/30 backdrop-blur-md rounded-t-2xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-teal-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-            <Brain className="w-5 h-5 text-white" />
+    <div className="flex h-[calc(100vh-6rem)] gap-6 animate-fade-in">
+      {/* Optional: Sidebar could go here in future */}
+      
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col glass-strong rounded-3xl border border-zinc-800/50 shadow-2xl overflow-hidden relative">
+        {/* Chat Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-2xl bg-[var(--gradient-primary)] p-[1px] shadow-[var(--shadow-glow)] shrink-0">
+              <div className="w-full h-full bg-zinc-950 rounded-[15px] flex items-center justify-center">
+                <Brain className="w-5 h-5 text-violet-400 brain-glow" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-zinc-100 font-semibold tracking-tight">AGI Orchestrator</h2>
+              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse" />
+                Online & Ready
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-white font-medium">AGI Orchestrator</h2>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Online & Ready
-            </p>
+          <div className="flex items-center gap-2">
+            <button className="p-2.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-all">
+              <LayoutPanelLeft className="w-5 h-5" />
+            </button>
+            <button className="p-2.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-all">
+              <MoreVertical className="w-5 h-5" />
+            </button>
           </div>
         </div>
-        <button className="p-2 text-zinc-400 hover:text-white transition-colors">
-          <MoreVertical className="w-5 h-5" />
-        </button>
-      </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-zinc-900/10">
-        {messages.map((msg, i) => (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            key={msg.id}
-            className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-          >
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-              msg.role === "user" 
-                ? "bg-zinc-800 border border-zinc-700" 
-                : "bg-gradient-to-br from-violet-500 to-teal-500 shadow-md shadow-violet-500/20"
-            }`}>
-              {msg.role === "user" ? <User className="w-4 h-4 text-zinc-300" /> : <Brain className="w-4 h-4 text-white" />}
-            </div>
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-zinc-900/20 custom-scrollbar relative z-0">
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                key={msg.id}
+                className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                  msg.role === "user" 
+                    ? "bg-zinc-800 border border-zinc-700 text-zinc-300" 
+                    : "bg-[var(--gradient-primary)] text-zinc-950 shadow-[var(--shadow-glow)]"
+                }`}>
+                  {msg.role === "user" ? <User className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
+                </div>
+                
+                <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 shadow-sm ${
+                  msg.role === "user" 
+                    ? "bg-violet-600/90 text-white rounded-tr-sm border border-violet-500/30 backdrop-blur-md" 
+                    : "bg-zinc-900/80 text-zinc-200 border border-zinc-700/50 rounded-tl-sm backdrop-blur-md"
+                }`}>
+                  <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
+                </div>
+              </motion.div>
+            ))}
+
+            {isTyping && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex gap-4"
+              >
+                <div className="w-9 h-9 rounded-xl bg-[var(--gradient-primary)] flex items-center justify-center shrink-0 shadow-[var(--shadow-glow)]">
+                  <Brain className="w-5 h-5 text-zinc-950" />
+                </div>
+                <div className="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 backdrop-blur-md">
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div ref={messagesEndRef} className="h-1" />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-5 bg-zinc-900/40 backdrop-blur-xl border-t border-zinc-800/50 z-10">
+          <form onSubmit={handleSend} className="relative flex items-center">
+            <button type="button" className="absolute left-4 p-2 text-zinc-400 hover:text-violet-400 transition-colors group">
+              <Paperclip className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </button>
             
-            <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${
-              msg.role === "user" 
-                ? "bg-violet-600 text-white" 
-                : "bg-zinc-800/80 text-zinc-200 border border-zinc-700/50"
-            }`}>
-              <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          </motion.div>
-        ))}
-
-        {isTyping && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-teal-500 flex items-center justify-center shrink-0">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <div className="bg-zinc-800/80 border border-zinc-700/50 rounded-2xl px-5 py-4 flex gap-1">
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
-          </motion.div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="p-4 bg-zinc-900/30 backdrop-blur-md border-t border-zinc-800/50 rounded-b-2xl">
-        <form onSubmit={handleSend} className="relative flex items-center">
-          <button type="button" className="absolute left-4 p-2 text-zinc-400 hover:text-white transition-colors">
-            <Paperclip className="w-5 h-5" />
-          </button>
-          
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Give the AGI a goal or ask a question..."
-            className="w-full bg-zinc-800/50 border border-zinc-700 text-white rounded-xl py-4 pl-14 pr-14 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder:text-zinc-500"
-          />
-          
-          <button 
-            type="submit" 
-            disabled={!input.trim() || isTyping}
-            className="absolute right-2 p-2 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors flex items-center justify-center"
-          >
-            {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </button>
-        </form>
-        <p className="text-center text-xs text-zinc-500 mt-3">
-          The AGI may take time to execute complex goals. Background tasks can be monitored in the Dashboard.
-        </p>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Give the AGI a goal or ask a question..."
+              className="w-full bg-zinc-900/80 border border-zinc-700/80 text-white rounded-2xl py-4 pl-14 pr-16 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all placeholder:text-zinc-500 glass shadow-inner"
+              disabled={isTyping}
+            />
+            
+            <button 
+              type="submit" 
+              disabled={!input.trim() || isTyping}
+              className="absolute right-3 p-2.5 bg-[var(--gradient-primary)] hover:opacity-90 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed text-zinc-950 rounded-xl transition-all flex items-center justify-center shadow-[var(--shadow-glow)]"
+            >
+              {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+            </button>
+          </form>
+          <p className="text-center text-xs font-medium text-zinc-600 mt-4">
+            The AGI may take time to execute complex goals. Background tasks can be monitored in the Dashboard.
+          </p>
+        </div>
       </div>
     </div>
   );

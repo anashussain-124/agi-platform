@@ -1,9 +1,17 @@
 """OpenRouter AI service - connects the Brain to multiple AI models."""
-from typing import Optional, List, AsyncGenerator
+from typing import Optional, List
 import httpx
-import json
 
 from app.core.config import settings
+from app.core.logging import logger
+
+
+class OpenRouterError(Exception):
+    """Raised when the OpenRouter API returns an error."""
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f"OpenRouter API error ({status_code}): {message}")
 
 
 class OpenRouterService:
@@ -19,20 +27,19 @@ class OpenRouterService:
     def route_task(self, task_description: str, requires_tools: bool = False) -> str:
         """Dynamically select the best model for the task based on heuristics."""
         task_lower = task_description.lower()
-        
+
         # Complex reasoning, planning, or architecture
         if any(kw in task_lower for kw in ["plan", "architect", "complex", "analyze", "strategy"]):
             return self.reasoning_model
-            
+
         # Agent execution / tool use
         if requires_tools or "execute" in task_lower or "tool" in task_lower:
             return self.agent_model
-            
-        # Coding (if we had a specific coding model)
+
+        # Coding tasks
         if any(kw in task_lower for kw in ["code", "refactor", "debug", "python", "typescript", "react"]):
-            # Fallback to reasoning model for code if no coding model is specified
             return self.reasoning_model
-            
+
         # Default lightweight/fast model (chat, summarization, etc)
         return self.default_model
 
@@ -54,6 +61,7 @@ class OpenRouterService:
     ) -> dict:
         """Send a chat completion request to OpenRouter."""
         if not self.api_key:
+            logger.warning("No OPENROUTER_API_KEY configured — returning dev mode response")
             return {
                 "choices": [{
                     "message": {
@@ -81,7 +89,7 @@ class OpenRouterService:
             )
 
             if response.status_code != 200:
-                raise Exception(f"OpenRouter API error: {response.text}")
+                raise OpenRouterError(response.status_code, response.text[:300])
 
             return response.json()
 
@@ -116,13 +124,13 @@ class OpenRouterService:
                 "choices": [{
                     "message": {
                         "role": "assistant",
-                        "content": "Development mode - no AI available.",
+                        "content": "Development mode — no AI available.",
                     }
                 }]
             }
 
         payload = {
-            "model": settings.OPENROUTER_AGENT_MODEL,
+            "model": self.agent_model,
             "messages": messages,
             "temperature": 0.5,
             "max_tokens": 8192,
@@ -138,21 +146,6 @@ class OpenRouterService:
             )
 
             if response.status_code != 200:
-                raise Exception(f"Agent chat error: {response.text}")
+                raise OpenRouterError(response.status_code, response.text[:300])
 
             return response.json()
-
-    async def select_model_for_task(self, task_type: str) -> str:
-        """Dynamically select the best model for a given task type."""
-        model_map = {
-            "reasoning": "google/gemma-2-9b-it:free",
-            "coding": "google/gemma-2-9b-it:free",
-            "writing": "meta-llama/llama-3-8b-instruct:free",
-            "analysis": "google/gemma-2-9b-it:free",
-            "research": "google/gemma-2-9b-it:free",
-            "creative": "meta-llama/llama-3-8b-instruct:free",
-            "quick": "meta-llama/llama-3-8b-instruct:free",
-            "planning": "google/gemma-2-9b-it:free",
-            "debugging": "google/gemma-2-9b-it:free",
-        }
-        return model_map.get(task_type, self.default_model)
