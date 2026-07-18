@@ -15,7 +15,7 @@ export function Skeleton({ className }: SkeletonProps) {
 /** Pre-built skeleton for a general card */
 export function CardSkeleton() {
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800/50 space-y-4">
+    <div className="p-6 rounded-2xl bg-panel/50 border border-hairline space-y-4">
       <div className="flex items-center gap-4">
         <Skeleton className="w-12 h-12 rounded-xl" />
         <div className="space-y-2 flex-1">
@@ -34,7 +34,7 @@ export function CardSkeleton() {
 /** Pre-built skeleton for a stat card */
 export function StatSkeleton() {
   return (
-    <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800/50 flex items-start gap-4">
+    <div className="p-5 rounded-2xl bg-panel/50 border border-hairline flex items-start gap-4">
       <Skeleton className="w-12 h-12 rounded-xl" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-3 w-20" />
@@ -47,7 +47,7 @@ export function StatSkeleton() {
 /** Pre-built skeleton for a list item */
 export function ListItemSkeleton() {
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex items-center gap-3">
+    <div className="bg-panel/50 border border-hairline rounded-xl p-4 flex items-center gap-3">
       <Skeleton className="w-6 h-6 rounded-md" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-4 w-48" />

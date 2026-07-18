@@ -19,17 +19,17 @@ import { ListItemSkeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ui/toast";
 
 const statusColors: Record<string, string> = {
-  pending: "bg-zinc-800/50 text-zinc-400 border-zinc-700",
-  in_progress: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  completed: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+  pending: "bg-panel-2 text-soft border-hairline",
+  in_progress: "bg-[var(--ion-dim)] text-ion border-ion/20",
+  completed: "bg-[var(--teal-dim)] text-teal border-teal/20",
   failed: "bg-red-500/10 text-red-400 border-red-500/20",
-  cancelled: "bg-zinc-800/50 text-zinc-500 border-zinc-700",
-  approval_needed: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  cancelled: "bg-panel-2 text-muted border-hairline",
+  approval_needed: "bg-[var(--signal-dim)] text-signal border-signal/20",
 };
 
 const priorityColors: Record<string, string> = {
-  low: "text-zinc-500 font-medium",
-  medium: "text-amber-400 font-medium",
+  low: "text-muted font-medium",
+  medium: "text-signal font-medium",
   high: "text-red-400 font-semibold",
   critical: "text-red-500 font-bold",
 };
@@ -41,19 +41,19 @@ export default function TasksPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   // Data fetching
-  const { 
-    data: tasks = [], 
-    loading: tasksLoading, 
-    refetch: fetchTasks 
+  const {
+    data: tasks = [],
+    loading: tasksLoading,
+    refetch: fetchTasks
   } = useApi({
     fetcher: () => api.getTasks(),
     errorMessage: "Failed to load tasks",
   });
 
-  const { 
-    data: goals = [], 
-    loading: goalsLoading, 
-    refetch: fetchGoals 
+  const {
+    data: goals = [],
+    loading: goalsLoading,
+    refetch: fetchGoals
   } = useApi({
     fetcher: () => api.getGoals(),
     errorMessage: "Failed to load goals",
@@ -64,7 +64,7 @@ export default function TasksPage() {
       showToast("Please provide a task title", "error");
       return;
     }
-    
+
     setIsCreating(true);
     try {
       await api.createTask(newTask);
@@ -84,20 +84,20 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-bone tracking-tight flex items-center gap-3 font-display">
             Tasks & Goals
-            <div className="status-pulse w-2 h-2 rounded-full bg-violet-400 ml-2" />
+            <div className="status-dot w-2 h-2 rounded-full bg-ion ml-2" />
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm text-soft mt-1">
             Plan, execute, and track progress with your Brain
           </p>
         </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm
-            ${showCreate 
-              ? "bg-zinc-800 text-zinc-300 hover:bg-zinc-700" 
-              : "bg-[var(--gradient-primary)] text-zinc-950 hover:opacity-90 shadow-[var(--shadow-glow)]"
+            ${showCreate
+              ? "bg-panel-2 text-soft hover:bg-hairline"
+              : "bg-[var(--gradient-primary)] text-ink hover:opacity-90 shadow-[var(--shadow-glow)]"
             }`}
         >
           <Plus className={`w-4 h-4 transition-transform ${showCreate ? "rotate-45" : ""}`} />
@@ -106,27 +106,27 @@ export default function TasksPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 glass p-1.5 rounded-xl w-fit border border-zinc-800/50">
+      <div className="flex gap-2 glass p-1.5 rounded-xl w-fit border border-hairline">
         <button
           onClick={() => setTab("tasks")}
           className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-            tab === "tasks" 
-              ? "bg-zinc-800 text-white shadow-sm" 
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            tab === "tasks"
+              ? "bg-panel-2 text-bone shadow-sm"
+              : "text-soft hover:text-bone hover:bg-panel-2/50"
           }`}
         >
-          <ListChecks className={`w-4 h-4 ${tab === "tasks" ? "text-violet-400" : ""}`} />
+          <ListChecks className={`w-4 h-4 ${tab === "tasks" ? "text-ion" : ""}`} />
           Tasks
         </button>
         <button
           onClick={() => setTab("goals")}
           className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-            tab === "goals" 
-              ? "bg-zinc-800 text-white shadow-sm" 
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            tab === "goals"
+              ? "bg-panel-2 text-bone shadow-sm"
+              : "text-soft hover:text-bone hover:bg-panel-2/50"
           }`}
         >
-          <Target className={`w-4 h-4 ${tab === "goals" ? "text-teal-400" : ""}`} />
+          <Target className={`w-4 h-4 ${tab === "goals" ? "text-teal" : ""}`} />
           Goals
         </button>
       </div>
@@ -140,13 +140,13 @@ export default function TasksPage() {
             exit={{ opacity: 0, height: 0, y: -20 }}
             className="overflow-hidden"
           >
-            <div className="glass-strong border-zinc-800/50 rounded-2xl p-5 space-y-4 shadow-lg mb-6">
+            <div className="instrument border-hairline rounded-2xl p-5 space-y-4 shadow-card mb-6">
               <input
                 type="text"
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                 placeholder="Task title..."
-                className="w-full bg-zinc-900/50 border border-zinc-800/80 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
+                className="w-full bg-panel/50 border border-hairline rounded-xl px-4 py-3 text-sm text-bone placeholder-muted focus:outline-none focus:ring-1 focus:ring-signal transition-all"
                 disabled={isCreating}
               />
               <textarea
@@ -154,16 +154,16 @@ export default function TasksPage() {
                 onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                 placeholder="What needs to be done?"
                 rows={3}
-                className="w-full bg-zinc-900/50 border border-zinc-800/80 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all resize-none custom-scrollbar"
+                className="w-full bg-panel/50 border border-hairline rounded-xl px-4 py-3 text-sm text-bone placeholder-muted focus:outline-none focus:ring-1 focus:ring-signal transition-all resize-none custom-scrollbar"
                 disabled={isCreating}
               />
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Priority:</span>
+                  <span className="text-xs font-medium text-muted uppercase tracking-wider font-mono">Priority:</span>
                   <select
                     value={newTask.priority}
                     onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                    className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    className="bg-panel border border-hairline rounded-lg px-3 py-2 text-sm text-soft focus:outline-none focus:ring-1 focus:ring-signal"
                     disabled={isCreating}
                   >
                     <option value="low">Low Priority</option>
@@ -175,7 +175,7 @@ export default function TasksPage() {
                 <button
                   onClick={handleCreate}
                   disabled={isCreating}
-                  className="px-6 py-2 bg-[var(--gradient-primary)] text-zinc-950 text-sm font-semibold rounded-xl transition-all shadow-[var(--shadow-glow)] disabled:opacity-50 hover:opacity-90"
+                  className="px-6 py-2 bg-[var(--gradient-primary)] text-ink text-sm font-semibold rounded-xl transition-all shadow-[var(--shadow-glow)] disabled:opacity-50 hover:opacity-90"
                 >
                   {isCreating ? "Creating..." : "Create Task"}
                 </button>
@@ -189,7 +189,7 @@ export default function TasksPage() {
         <AnimatePresence mode="wait">
           {tab === "tasks" ? (
             /* Tasks List */
-            <motion.div 
+            <motion.div
               key="tasks"
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -205,14 +205,14 @@ export default function TasksPage() {
                   <ListItemSkeleton />
                 </>
               ) : tasks && tasks.length === 0 ? (
-                <div className="text-center py-16 glass rounded-2xl border-dashed border-zinc-800">
-                  <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mx-auto mb-4 shadow-inner">
-                    <ListChecks className="w-8 h-8 text-zinc-600" />
+                <div className="text-center py-16 glass rounded-2xl border-dashed border-hairline">
+                  <div className="w-16 h-16 rounded-full bg-panel flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <ListChecks className="w-8 h-8 text-muted" />
                   </div>
-                  <p className="text-zinc-400 font-medium">No tasks yet</p>
+                  <p className="text-soft font-medium">No tasks yet</p>
                   <button
                     onClick={() => setShowCreate(true)}
-                    className="text-sm text-violet-400 hover:text-violet-300 mt-2 font-medium transition-colors"
+                    className="text-sm text-ion hover:text-signal mt-2 font-medium transition-colors"
                   >
                     Create your first task
                   </button>
@@ -224,34 +224,34 @@ export default function TasksPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05, duration: 0.3 }}
-                    className="glass card-hover border-zinc-800/50 rounded-2xl p-4 md:p-5 group"
+                    className="instrument border-hairline rounded-2xl p-4 md:p-5 group hover:border-hairline-strong transition-colors"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-start gap-4">
                         <div
                           className={`w-3 h-3 rounded-full mt-1.5 shrink-0 ${
                             task.status === "completed"
-                              ? "bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.5)]"
+                              ? "bg-teal shadow-[0_0_8px_rgba(53,208,186,0.5)]"
                               : task.status === "in_progress"
-                              ? "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse"
+                              ? "bg-ion shadow-[0_0_8px_rgba(139,123,240,0.5)] animate-pulse"
                               : task.status === "failed"
                               ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-                              : "bg-zinc-600"
+                              : "bg-muted"
                           }`}
                         />
                         <div>
-                          <h3 className="text-sm font-semibold text-zinc-100">{task.title}</h3>
+                          <h3 className="text-sm font-semibold text-bone">{task.title}</h3>
                           {task.description && (
-                            <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed">{task.description}</p>
+                            <p className="text-sm text-soft mt-1 line-clamp-2 leading-relaxed">{task.description}</p>
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 self-start sm:self-center ml-7 sm:ml-0">
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${statusColors[task.status] || ""}`}>
                           {task.status.replace("_", " ")}
                         </span>
-                        <span className={`text-xs ${priorityColors[task.priority] || "text-zinc-500"}`}>
+                        <span className={`text-xs ${priorityColors[task.priority] || "text-muted"}`}>
                           {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                         </span>
                       </div>
@@ -262,7 +262,7 @@ export default function TasksPage() {
             </motion.div>
           ) : (
             /* Goals List */
-            <motion.div 
+            <motion.div
               key="goals"
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -277,12 +277,12 @@ export default function TasksPage() {
                   <ListItemSkeleton />
                 </>
               ) : goals && goals.length === 0 ? (
-                <div className="col-span-full text-center py-16 glass rounded-2xl border-dashed border-zinc-800">
-                  <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mx-auto mb-4 shadow-inner">
-                    <Target className="w-8 h-8 text-zinc-600" />
+                <div className="col-span-full text-center py-16 glass rounded-2xl border-dashed border-hairline">
+                  <div className="w-16 h-16 rounded-full bg-panel flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <Target className="w-8 h-8 text-muted" />
                   </div>
-                  <p className="text-zinc-400 font-medium">No goals defined yet</p>
-                  <p className="text-sm text-zinc-500 mt-1">
+                  <p className="text-soft font-medium">No goals defined yet</p>
+                  <p className="text-sm text-muted mt-1">
                     Goals help your Brain understand what you're working toward
                   </p>
                 </div>
@@ -293,33 +293,33 @@ export default function TasksPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05, duration: 0.3 }}
-                    className="glass card-hover border-zinc-800/50 rounded-2xl p-6"
+                    className="instrument border-hairline rounded-2xl p-6 hover:border-hairline-strong transition-colors"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
-                          <Target className="w-5 h-5 text-teal-400" />
+                        <div className="w-10 h-10 rounded-xl bg-[var(--teal-dim)] border border-teal/20 flex items-center justify-center shrink-0">
+                          <Target className="w-5 h-5 text-teal" />
                         </div>
                         <div>
-                          <h3 className="text-base font-semibold text-zinc-100 line-clamp-1">{goal.title}</h3>
-                          <span className="text-xs font-medium text-teal-400 capitalize">{goal.status}</span>
+                          <h3 className="text-base font-semibold text-bone line-clamp-1">{goal.title}</h3>
+                          <span className="text-xs font-medium text-teal capitalize">{goal.status}</span>
                         </div>
                       </div>
                     </div>
-                    
+
                     {goal.description && (
-                      <p className="text-sm text-zinc-400 leading-relaxed mb-6 line-clamp-2">{goal.description}</p>
+                      <p className="text-sm text-soft leading-relaxed mb-6 line-clamp-2">{goal.description}</p>
                     )}
-                    
+
                     {/* Progress bar */}
                     <div className="mt-auto">
                       <div className="flex items-center justify-between text-xs font-medium mb-2">
-                        <span className="text-zinc-300">Progress</span>
-                        <span className="text-white bg-zinc-800 px-2 py-0.5 rounded">{Math.round(goal.progress * 100)}%</span>
+                        <span className="text-soft">Progress</span>
+                        <span className="text-bone bg-panel-2 px-2 py-0.5 rounded font-mono">{Math.round(goal.progress * 100)}%</span>
                       </div>
-                      <div className="w-full bg-zinc-900 rounded-full h-2 border border-zinc-800 overflow-hidden">
+                      <div className="w-full bg-panel-2 rounded-full h-2 border border-hairline overflow-hidden">
                         <div
-                          className="bg-gradient-to-r from-violet-500 to-teal-400 h-full rounded-full transition-all duration-1000 ease-out relative"
+                          className="bg-gradient-to-r from-signal to-ion h-full rounded-full transition-all duration-1000 ease-out relative"
                           style={{ width: `${Math.round(goal.progress * 100)}%` }}
                         >
                           <div className="absolute inset-0 bg-white/20 shimmer" />

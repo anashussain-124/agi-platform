@@ -85,9 +85,9 @@ export default function ChatPage() {
 
     const userMessage = input;
     const newMsg: Message = { id: Date.now().toString(), role: "user", content: userMessage };
-    
+
     // Clear placeholder message if it's the only one
-    setMessages(prev => 
+    setMessages(prev =>
       prev.length === 1 && prev[0].id === "placeholder" ? [newMsg] : [...prev, newMsg]
     );
     setInput("");
@@ -95,7 +95,7 @@ export default function ChatPage() {
 
     try {
       const data = await api.chat(userMessage, conversationId || undefined);
-      
+
       // Save conversation ID if this was a new conversation
       if (!conversationId && data.conversation_id) {
         setConversationId(data.conversation_id);
@@ -127,38 +127,38 @@ export default function ChatPage() {
   return (
     <div className="flex h-[calc(100vh-6rem)] gap-6 animate-fade-in">
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col glass-strong rounded-3xl border border-zinc-800/50 shadow-2xl overflow-hidden relative">
+      <div className="flex-1 flex flex-col instrument rounded-3xl shadow-card overflow-hidden relative">
         {/* Chat Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl z-10">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-hairline bg-panel/60 backdrop-blur-xl z-10">
           <div className="flex items-center gap-4">
             <div className="w-11 h-11 rounded-2xl bg-[var(--gradient-primary)] p-[1px] shadow-[var(--shadow-glow)] shrink-0">
-              <div className="w-full h-full bg-zinc-950 rounded-[15px] flex items-center justify-center">
-                <Brain className="w-5 h-5 text-violet-400 brain-glow" />
+              <div className="w-full h-full bg-ink rounded-[15px] flex items-center justify-center">
+                <Brain className="w-5 h-5 text-ion brain-glow" />
               </div>
             </div>
             <div>
-              <h2 className="text-zinc-100 font-semibold tracking-tight">AGI Orchestrator</h2>
-              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse" />
+              <h2 className="text-bone font-semibold tracking-tight">AGI Orchestrator</h2>
+              <p className="text-xs font-medium text-teal flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal status-dot" />
                 Online & Ready
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-2.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-all">
+            <button className="p-2.5 text-soft hover:text-bone hover:bg-panel-2 rounded-xl transition-all">
               <LayoutPanelLeft className="w-5 h-5" />
             </button>
-            <button className="p-2.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-all">
+            <button className="p-2.5 text-soft hover:text-bone hover:bg-panel-2 rounded-xl transition-all">
               <MoreVertical className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-zinc-900/20 custom-scrollbar relative z-0">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-ink/40 custom-scrollbar relative z-0">
           {loadingHistory && conversationId ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+              <Loader2 className="w-8 h-8 text-ion animate-spin" />
             </div>
           ) : (
             <AnimatePresence initial={false}>
@@ -170,17 +170,17 @@ export default function ChatPage() {
                   className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-                    msg.role === "user" 
-                      ? "bg-zinc-800 border border-zinc-700 text-zinc-300" 
-                      : "bg-[var(--gradient-primary)] text-zinc-950 shadow-[var(--shadow-glow)]"
+                    msg.role === "user"
+                      ? "bg-panel-2 border border-hairline text-soft"
+                      : "bg-[var(--gradient-primary)] text-ink shadow-[var(--shadow-glow)]"
                   }`}>
                     {msg.role === "user" ? <User className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
                   </div>
-                  
+
                   <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 shadow-sm ${
-                    msg.role === "user" 
-                      ? "bg-violet-600/90 text-white rounded-tr-sm border border-violet-500/30 backdrop-blur-md" 
-                      : "bg-zinc-900/80 text-zinc-200 border border-zinc-700/50 rounded-tl-sm backdrop-blur-md"
+                    msg.role === "user"
+                      ? "bg-ion/90 text-ink rounded-tr-sm border border-ion/30 backdrop-blur-md"
+                      : "bg-panel text-bone border border-hairline rounded-tl-sm backdrop-blur-md"
                   }`}>
                     <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
                   </div>
@@ -188,19 +188,19 @@ export default function ChatPage() {
               ))}
 
               {isTyping && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} 
-                  animate={{ opacity: 1, y: 0 }} 
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="flex gap-4"
                 >
                   <div className="w-9 h-9 rounded-xl bg-[var(--gradient-primary)] flex items-center justify-center shrink-0 shadow-[var(--shadow-glow)]">
-                    <Brain className="w-5 h-5 text-zinc-950" />
+                    <Brain className="w-5 h-5 text-ink" />
                   </div>
-                  <div className="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 backdrop-blur-md">
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <div className="bg-panel border border-hairline rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 backdrop-blur-md">
+                    <span className="w-2 h-2 bg-ion rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-ion rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-ion rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
                 </motion.div>
               )}
@@ -210,30 +210,30 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-5 bg-zinc-900/40 backdrop-blur-xl border-t border-zinc-800/50 z-10">
+        <div className="p-5 bg-panel/60 backdrop-blur-xl border-t border-hairline z-10">
           <form onSubmit={handleSend} className="relative flex items-center">
-            <button type="button" className="absolute left-4 p-2 text-zinc-400 hover:text-violet-400 transition-colors group">
+            <button type="button" className="absolute left-4 p-2 text-soft hover:text-ion transition-colors group">
               <Paperclip className="w-5 h-5 group-hover:scale-110 transition-transform" />
             </button>
-            
+
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Give the AGI a goal or ask a question..."
-              className="w-full bg-zinc-900/80 border border-zinc-700/80 text-white rounded-2xl py-4 pl-14 pr-16 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all placeholder:text-zinc-500 glass shadow-inner"
+              className="w-full bg-panel/80 border border-hairline text-bone rounded-2xl py-4 pl-14 pr-16 focus:outline-none focus:ring-1 focus:ring-signal transition-all placeholder:text-muted glass shadow-inner"
               disabled={isTyping}
             />
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={!input.trim() || isTyping}
-              className="absolute right-3 p-2.5 bg-[var(--gradient-primary)] hover:opacity-90 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed text-zinc-950 rounded-xl transition-all flex items-center justify-center shadow-[var(--shadow-glow)]"
+              className="absolute right-3 p-2.5 bg-[var(--gradient-primary)] hover:opacity-90 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed text-ink rounded-xl transition-all flex items-center justify-center shadow-[var(--shadow-glow)]"
             >
               {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
             </button>
           </form>
-          <p className="text-center text-xs font-medium text-zinc-600 mt-4">
+          <p className="text-center text-xs font-medium text-muted mt-4">
             The AGI may take time to execute complex goals. Background tasks can be monitored in the Dashboard.
           </p>
         </div>
