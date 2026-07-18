@@ -47,6 +47,7 @@ class Task(Base):
     # Assignment
     assigned_agent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Which agent handles this
     parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    goal_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)  # Links task to an Executive Brain goal
     
     # Results
     result: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)

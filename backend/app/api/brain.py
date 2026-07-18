@@ -14,7 +14,7 @@ from app.models.user import User
 from app.models.brain import Brain, BrainModule, Conversation, Message
 from app.api.auth import get_current_user
 from app.services.ai_service import OpenRouterService
-from app.services.memory_service import MemoryService
+from app.services.executive_brain import ExecutiveBrain
 from app.core.logging import logger
 
 router = APIRouter(prefix="/api/brain", tags=["brain"])
@@ -207,8 +207,176 @@ async def update_brain(
 
 
 # ──────────────────────────────────────────────────────────
+# Executive Brain — goal execution
+# ──────────────────────────────────────────────────────────
+
+class GoalRequest(BaseModel):
+    goal: str
+    description: Optional[str] = None
+    context: Optional[str] = None
+    execute: bool = True
+
+
+class PlanRequest(BaseModel):
+    goal: str
+    context: Optional[str] = None
+
+
+async def _get_user_brain_id(user: User, db: AsyncSession) -> str:
+    """Resolve the user's brain id (works in both Supabase and SQLAlchemy modes)."""
+    repo = BrainRepository(db)
+    brain = await repo.get_brain_for_user(str(user.id))
+    if not brain:
+        raise HTTPException(status_code=404, detail="Brain not found. Create one first.")
+    return brain["id"] if isinstance(brain, dict) else str(brain.id)
+
+
+@router.post("/goal")
+async def execute_goal(
+    req: GoalRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """Decompose a goal and execute it via the multi-agent Executive Brain."""
+    try:
+        brain_id = await _get_user_brain_id(user, db)
+        eb = ExecutiveBrain(brain_id=brain_id, db=db)
+        if req.execute:
+            result = await eb.execute_goal(req.goal, req.description, req.context)
+        else:
+            result = await eb.quick_plan(req.goal, req.context)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Goal execution error: %s", str(e)[:300])
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
+
+
+@router.post("/goal/plan")
+async def plan_goal(
+    req: PlanRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """Preview a goal's decomposed plan WITHOUT executing (for approval flows)."""
+    try:
+        brain_id = await _get_user_brain_id(user, db)
+        eb = ExecutiveBrain(brain_id=brain_id, db=db)
+        return await eb.quick_plan(req.goal, req.context)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Goal plan error: %s", str(e)[:300])
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
+
+
+@router.get("/goals")
+async def list_brain_goals(
+    limit: int = 20,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """List goals created by the Executive Brain for this user's brain."""
+    try:
+        brain_id = await _get_user_brain_id(user, db)
+        from app.core.repository import get_supabase
+        supabase = get_supabase()
+        if supabase:
+            rows = await supabase.get("goals", filters={"brain_id": brain_id},
+                                      order="created_at.desc", limit=limit)
+            return [{"id": r["id"], "title": r.get("title", ""),
+                     "status": r.get("status", ""), "progress": r.get("progress", 0),
+                     "created_at": r.get("created_at", "")} for r in rows]
+        result = await db.execute(
+            select(Goal).where(Goal.brain_id == uuid.UUID(brain_id))
+            .order_by(desc(Goal.created_at)).limit(limit)
+        )
+        return [{"id": str(g.id), "title": g.title, "status": g.status,
+                "progress": g.progress, "created_at": g.created_at.isoformat()}
+                for g in result.scalars().all()]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("List goals error: %s", str(e)[:300])
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
+
+
+@router.get("/goal/{goal_id}")
+async def get_goal(
+    goal_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """Fetch a single goal and its linked tasks."""
+    try:
+        brain_id = await _get_user_brain_id(user, db)
+        from app.core.repository import get_supabase
+        supabase = get_supabase()
+        if supabase:
+            goal = await supabase.get("goals", filters={"id": goal_id}, single=True)
+            tasks = await supabase.get("tasks", filters={"goal_id": goal_id},
+                                       order="created_at.asc", limit=50)
+            if not goal:
+                raise HTTPException(status_code=404, detail="Goal not found")
+            return {
+                "goal": {"id": goal["id"], "title": goal.get("title", ""),
+                         "status": goal.get("status", ""), "progress": goal.get("progress", 0)},
+                "tasks": [{"id": t["id"], "title": t.get("title", ""),
+                           "assigned_agent": t.get("assigned_agent"),
+                           "status": t.get("status", ""),
+                           "result": (t.get("result") or {}).get("result", "")[:600]}
+                          for t in tasks],
+            }
+        goal = await db.get(Goal, uuid.UUID(goal_id))
+        if not goal or str(goal.brain_id) != brain_id:
+            raise HTTPException(status_code=404, detail="Goal not found")
+        result = await db.execute(
+            select(Task).where(Task.goal_id == uuid.UUID(goal_id)).order_by(Task.created_at))
+        return {
+            "goal": {"id": str(goal.id), "title": goal.title, "status": goal.status,
+                     "progress": goal.progress},
+            "tasks": [{"id": str(t.id), "title": t.title, "assigned_agent": t.assigned_agent,
+                       "status": t.status.value, "result": (t.result or {}).get("result", "")[:600]}
+                      for t in result.scalars().all()],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Get goal error: %s", str(e)[:300])
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:300]}")
+
+
+# ──────────────────────────────────────────────────────────
 # Chat
 # ──────────────────────────────────────────────────────────
+
+async def _build_memory_context(brain_id: str) -> Optional[str]:
+    """Load recent memory entries as a system-context block for the chat model."""
+    from app.core.repository import get_supabase
+    supabase = get_supabase()
+    if not supabase:
+        return None
+    try:
+        rows = await supabase.get(
+            "memory_entries", filters={"brain_id": brain_id},
+            order="created_at.desc", limit=6,
+        )
+        if not rows:
+            return None
+        parts = []
+        for r in rows:
+            mtype = r.get("memory_type", "memory")
+            parts.append(f"[{mtype.upper()}] {r.get('title', '')}: {r.get('content', '')[:240]}")
+        return (
+            "You are the user's persistent AI Brain. The following is your recalled "
+            "memory — use it to stay consistent with prior context:\n"
+            + "\n".join(parts)
+        )
+    except Exception as e:
+        logger.warning("Memory context build failed: %s", str(e)[:120])
+        return None
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -249,6 +417,11 @@ async def chat(
         # Build message history
         msgs = await repo.get_messages(conv_id, limit=50)
         history = [{"role": m["role"], "content": m["content"]} for m in msgs]
+
+        # Inject working-memory context so the Brain isn't amnesiac across turns.
+        memory_context = await _build_memory_context(brain_id)
+        if memory_context:
+            history.insert(0, {"role": "system", "content": memory_context})
 
         # Get AI response
         try:

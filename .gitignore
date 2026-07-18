@@ -14,3 +14,10 @@ __pycache__/
 .vercel/
 *.egg-info/
 dist/
+
+# Test artifacts (tokens, scratch scripts)
+login.json
+test_eb.sh
+test_eb.py
+goal.json
+hdr.txt
