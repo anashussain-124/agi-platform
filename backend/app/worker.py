@@ -100,8 +100,8 @@ async def _async_process_learning(brain_id: str, conversation_id: str):
         try:
             response = await ai_service.chat(
                 messages=[{"role": "user", "content": prompt}],
-                model=ai_service.reasoning_model,
-                temperature=0.1
+                model="reasoning",
+                temperature=0.1,
             )
             import json
             import re

@@ -221,7 +221,7 @@ class ExecutiveBrain:
                     {"role": "system", "content": sys_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                model="openai/gpt-4o-mini",
+                model="reasoning",
                 temperature=0.3,
                 max_tokens=4096,
             )

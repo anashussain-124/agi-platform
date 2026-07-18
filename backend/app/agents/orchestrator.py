@@ -142,10 +142,9 @@ class AgentOrchestrator:
                 # Dynamically route to the best model for the task
                 model = self.ai_service.route_task(task, requires_tools=len(tools) > 0)
 
-                # Override with agent preference if it exists and we didn't specifically route
-                if agent.capabilities and model == self.ai_service.default_model:
-                    model = agent.capabilities[0].model_preference
-
+                # Use the unified routing tier (reasoning/fast) for all agents.
+                # Agent-specific model preferences are ignored to keep everything
+                # on the free provider chain.
                 response = await self.ai_service.chat(messages=messages, model=model)
                 result = response["choices"][0]["message"]["content"]
             else:

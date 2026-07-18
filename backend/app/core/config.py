@@ -38,12 +38,28 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: Optional[str] = None
     SUPABASE_SERVICE_KEY: Optional[str] = None
 
-    # OpenRouter
+    # ── LLM providers (used as a unified fallback chain) ──────────────
+    # OpenRouter (kept as a fallback tier)
     OPENROUTER_API_KEY: Optional[str] = None
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = "openai/gpt-4o-mini"
     OPENROUTER_REASONING_MODEL: str = "anthropic/claude-sonnet-4"
     OPENROUTER_AGENT_MODEL: str = "openai/gpt-4o"
+
+    # Groq — primary free provider (fast, OpenAI-compatible)
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_FAST_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_REASONING_MODEL: str = "llama-3.3-70b-versatile"
+
+    # Google Gemini — secondary free provider (native REST)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_FAST_MODEL: str = "gemini-2.0-flash"
+    GEMINI_REASONING_MODEL: str = "gemini-2.0-flash"
+
+    # HuggingFace — tertiary fallback (Inference API)
+    HF_API_KEY: Optional[str] = None
+    HF_MODEL: str = "meta-llama/Llama-3.3-70B-Instruct"
 
     # Auth
     JWT_SECRET: str = "change-me-in-production-jwt"

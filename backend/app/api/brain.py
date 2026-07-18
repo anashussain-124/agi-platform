@@ -430,8 +430,9 @@ async def chat(
         except Exception as e:
             logger.error("AI service error: %s", str(e)[:200])
             ai_text = (
-                f"I encountered an issue connecting to the AI service: {e}\n\n"
-                "Make sure OPENROUTER_API_KEY is set in your .env file."
+                "I encountered an issue connecting to the AI service: {e}\n\n"
+                "Make sure a free LLM provider key (GROQ_API_KEY, GEMINI_API_KEY, "
+                "OPENROUTER_API_KEY, or HF_API_KEY) is set in your environment."
             )
 
         # Save AI response
