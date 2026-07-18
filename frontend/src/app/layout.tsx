@@ -1,21 +1,32 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const body = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  variable: "--font-jetbrains",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Brain AGI Platform",
-  description: "Your personal AI operating system - reason, remember, plan, and build.",
+  title: "Brain AGI — Your personal AI operating system",
+  description:
+    "Brain AGI thinks, plans, remembers, and builds. An autonomous platform that reasons over your goals and executes them.",
 };
 
 export default function RootLayout({
@@ -26,9 +37,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${display.variable} ${body.variable} ${mono.variable} h-full antialiased dark`}
     >
-      <body className="h-full bg-zinc-950 text-zinc-100">
+      <body className="h-full bg-[var(--ink)] text-[var(--bone)]">
         {children}
         <ToastProvider />
       </body>

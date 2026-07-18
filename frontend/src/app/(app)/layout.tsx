@@ -53,10 +53,10 @@ export default function AppLayout({
   const isFullHeightRoute = pathname === "/chat";
 
   return (
-    <div className="flex h-full bg-zinc-950 bg-grid relative overflow-hidden">
+    <div className="flex h-full bg-[var(--ink)] bg-grid relative overflow-hidden">
       {/* Background glowing orbs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[var(--glow-violet)] blur-[120px]" />
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[var(--glow-ion)] blur-[120px]" />
         <div className="absolute bottom-[10%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[var(--glow-teal)] blur-[120px]" />
       </div>
 
@@ -72,7 +72,7 @@ export default function AppLayout({
       <aside
         className={`
           fixed md:static inset-y-0 left-0 z-50 w-64
-          glass border-r border-zinc-800/50
+          glass border-r border-[var(--hairline)]
           transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0
@@ -80,16 +80,16 @@ export default function AppLayout({
         `}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-zinc-800/50">
+        <div className="p-6 border-b border-[var(--hairline)]">
           <Link href="/dashboard" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-[var(--gradient-primary)] p-[1px] shadow-[var(--shadow-glow)] transition-transform duration-300 group-hover:scale-105">
-              <div className="w-full h-full bg-zinc-950 rounded-[11px] flex items-center justify-center">
-                <Brain className="w-5 h-5 text-violet-400 brain-glow" />
+              <div className="w-full h-full bg-[var(--ink)] rounded-[11px] flex items-center justify-center">
+                <Brain className="w-5 h-5 text-signal brain-glow" />
               </div>
             </div>
             <div>
-              <h1 className="text-base font-semibold text-zinc-100 tracking-tight">Brain AGI</h1>
-              <p className="text-xs text-zinc-500 font-medium">Platform</p>
+              <h1 className="text-base font-semibold text-[var(--bone)] tracking-tight font-display">Brain AGI</h1>
+              <p className="text-xs text-[var(--muted)] font-mono tracking-widest uppercase">Platform</p>
             </div>
           </Link>
         </div>
@@ -108,12 +108,12 @@ export default function AppLayout({
                   flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
                   ${
                     isActive
-                      ? "bg-violet-500/15 text-violet-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-violet-500/20"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 hover:shadow-sm"
+                      ? "bg-[var(--ion-dim)] text-[var(--ion)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-[var(--ion-dim)]"
+                      : "text-[var(--bone-soft)] hover:text-[var(--bone)] hover:bg-[var(--panel-2)]"
                   }
                 `}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-violet-400" : ""}`} />
+                <Icon className={`w-4 h-4 ${isActive ? "text-signal" : ""}`} />
                 {item.label}
               </Link>
             );
@@ -121,10 +121,10 @@ export default function AppLayout({
         </nav>
 
         {/* Logout */}
-        <div className="p-4 border-t border-zinc-800/50">
+        <div className="p-4 border-t border-[var(--hairline)]">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-400 hover:text-red-400 hover:bg-red-500/10 w-full transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--bone-soft)] hover:text-[#ff6b6b] hover:bg-[rgba(255,107,107,0.1)] w-full transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -135,20 +135,20 @@ export default function AppLayout({
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 z-10 relative">
         {/* Mobile header */}
-        <header className="md:hidden flex items-center gap-3 p-4 glass border-b border-zinc-800/50 sticky top-0 z-30">
+        <header className="md:hidden flex items-center gap-3 p-4 glass border-b border-[var(--hairline)] sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl hover:bg-zinc-800/50 text-zinc-400 transition-colors"
+            className="p-2 rounded-xl hover:bg-[var(--panel-2)] text-[var(--bone-soft)] transition-colors"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[var(--gradient-primary)] p-[1px]">
-              <div className="w-full h-full bg-zinc-950 rounded-[7px] flex items-center justify-center">
-                <Brain className="w-4 h-4 text-violet-400" />
+              <div className="w-full h-full bg-[var(--ink)] rounded-[7px] flex items-center justify-center">
+                <Brain className="w-4 h-4 text-signal" />
               </div>
             </div>
-            <span className="text-sm font-semibold tracking-tight">Brain AGI</span>
+            <span className="text-sm font-semibold tracking-tight font-display">Brain AGI</span>
           </div>
         </header>
 
