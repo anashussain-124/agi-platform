@@ -12,6 +12,25 @@ export function Skeleton({ className }: SkeletonProps) {
   );
 }
 
+/** Pre-built skeleton for a general card */
+export function CardSkeleton() {
+  return (
+    <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800/50 space-y-4">
+      <div className="flex items-center gap-4">
+        <Skeleton className="w-12 h-12 rounded-xl" />
+        <div className="space-y-2 flex-1">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    </div>
+  );
+}
+
 /** Pre-built skeleton for a stat card */
 export function StatSkeleton() {
   return (

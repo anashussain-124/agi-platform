@@ -15,13 +15,15 @@ interface Message {
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: "1",
+      id: "placeholder",
       role: "ai",
       content: "Hello! I am your AGI Assistant. I can browse the web, read your files, and execute complex background tasks. What are we working on today?",
     }
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,6 +34,51 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // Load the most recent conversation on mount
+  useEffect(() => {
+    async function loadLatestConversation() {
+      try {
+        const convs = await api.getConversations(1);
+        if (convs && convs.length > 0) {
+          setConversationId(convs[0].id);
+        } else {
+          setLoadingHistory(false);
+        }
+      } catch (err) {
+        console.error("Failed to load conversation list:", err);
+        setLoadingHistory(false);
+      }
+    }
+    loadLatestConversation();
+  }, []);
+
+  // Fetch messages when conversationId is set
+  useEffect(() => {
+    if (!conversationId) return;
+    const activeId = conversationId;
+
+    async function loadMessages() {
+      setLoadingHistory(true);
+      try {
+        const history = await api.getMessages(activeId);
+        if (history && history.length > 0) {
+          setMessages(
+            history.map((msg) => ({
+              id: msg.id,
+              role: msg.role === "assistant" ? "ai" : "user",
+              content: msg.content,
+            }))
+          );
+        }
+      } catch (err: any) {
+        showToast("Failed to load chat history", "error");
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+    loadMessages();
+  }, [conversationId]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -39,12 +86,21 @@ export default function ChatPage() {
     const userMessage = input;
     const newMsg: Message = { id: Date.now().toString(), role: "user", content: userMessage };
     
-    setMessages(prev => [...prev, newMsg]);
+    // Clear placeholder message if it's the only one
+    setMessages(prev => 
+      prev.length === 1 && prev[0].id === "placeholder" ? [newMsg] : [...prev, newMsg]
+    );
     setInput("");
     setIsTyping(true);
 
     try {
-      const data = await api.chat(userMessage);
+      const data = await api.chat(userMessage, conversationId || undefined);
+      
+      // Save conversation ID if this was a new conversation
+      if (!conversationId && data.conversation_id) {
+        setConversationId(data.conversation_id);
+      }
+
       setMessages(prev => [
         ...prev,
         {
@@ -70,8 +126,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-6rem)] gap-6 animate-fade-in">
-      {/* Optional: Sidebar could go here in future */}
-      
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col glass-strong rounded-3xl border border-zinc-800/50 shadow-2xl overflow-hidden relative">
         {/* Chat Header */}
@@ -102,50 +156,56 @@ export default function ChatPage() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-zinc-900/20 custom-scrollbar relative z-0">
-          <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                key={msg.id}
-                className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-                  msg.role === "user" 
-                    ? "bg-zinc-800 border border-zinc-700 text-zinc-300" 
-                    : "bg-[var(--gradient-primary)] text-zinc-950 shadow-[var(--shadow-glow)]"
-                }`}>
-                  {msg.role === "user" ? <User className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
-                </div>
-                
-                <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 shadow-sm ${
-                  msg.role === "user" 
-                    ? "bg-violet-600/90 text-white rounded-tr-sm border border-violet-500/30 backdrop-blur-md" 
-                    : "bg-zinc-900/80 text-zinc-200 border border-zinc-700/50 rounded-tl-sm backdrop-blur-md"
-                }`}>
-                  <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
-                </div>
-              </motion.div>
-            ))}
+          {loadingHistory && conversationId ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+            </div>
+          ) : (
+            <AnimatePresence initial={false}>
+              {messages.map((msg) => (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  key={msg.id}
+                  className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                    msg.role === "user" 
+                      ? "bg-zinc-800 border border-zinc-700 text-zinc-300" 
+                      : "bg-[var(--gradient-primary)] text-zinc-950 shadow-[var(--shadow-glow)]"
+                  }`}>
+                    {msg.role === "user" ? <User className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
+                  </div>
+                  
+                  <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 shadow-sm ${
+                    msg.role === "user" 
+                      ? "bg-violet-600/90 text-white rounded-tr-sm border border-violet-500/30 backdrop-blur-md" 
+                      : "bg-zinc-900/80 text-zinc-200 border border-zinc-700/50 rounded-tl-sm backdrop-blur-md"
+                  }`}>
+                    <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
+                  </div>
+                </motion.div>
+              ))}
 
-            {isTyping && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex gap-4"
-              >
-                <div className="w-9 h-9 rounded-xl bg-[var(--gradient-primary)] flex items-center justify-center shrink-0 shadow-[var(--shadow-glow)]">
-                  <Brain className="w-5 h-5 text-zinc-950" />
-                </div>
-                <div className="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 backdrop-blur-md">
-                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              {isTyping && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-[var(--gradient-primary)] flex items-center justify-center shrink-0 shadow-[var(--shadow-glow)]">
+                    <Brain className="w-5 h-5 text-zinc-950" />
+                  </div>
+                  <div className="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 backdrop-blur-md">
+                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
           <div ref={messagesEndRef} className="h-1" />
         </div>
 

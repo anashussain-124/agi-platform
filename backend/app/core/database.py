@@ -12,18 +12,29 @@ from app.core.config import settings
 def _build_async_url() -> str:
     """Prepare the async database URL with appropriate SSL settings."""
     url = settings.DATABASE_URL
-    is_supabase = "supabase.co" in url or "pooler.supabase.com" in url
-    if is_supabase and "ssl" not in url.lower() and "sslmode" not in url.lower():
-        sep = "&" if "?" in url else "?"
-        url += f"{sep}ssl=require"
+    # Strip sslmode param from URL since asyncpg handles SSL via connect_args
+    import re
+    url = re.sub(r'[?&]sslmode=[^&]*', '', url)
+    # Clean up any trailing ? left over
+    url = url.rstrip('?')
     return url
 
 
 def _build_connect_args() -> dict:
     """Connection args for async engine — disables prepared stmt cache for Supabase pooler."""
+    import ssl as _ssl
+    args: dict = {}
+    is_supabase = "supabase.co" in settings.DATABASE_URL or "pooler.supabase.com" in settings.DATABASE_URL
+    if is_supabase:
+        # Create an SSL context that doesn't verify certs (Supabase uses self-signed in pooler)
+        ctx = _ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = _ssl.CERT_NONE
+        args["ssl"] = ctx
     if "pooler.supabase.com" in settings.DATABASE_URL:
-        return {"prepared_statement_cache_size": 0, "statement_cache_size": 0}
-    return {}
+        args["prepared_statement_cache_size"] = 0
+        args["statement_cache_size"] = 0
+    return args
 
 
 async_engine = create_async_engine(

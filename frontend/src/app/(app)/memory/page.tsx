@@ -43,9 +43,19 @@ export default function MemoryPage() {
     loading, 
     refetch: fetchMemories 
   } = useApi({
-    fetcher: () => searchQuery.trim() 
-      ? api.searchMemories(searchQuery)
-      : api.getMemories(filter || undefined),
+    fetcher: async () => {
+      if (searchQuery.trim()) {
+        const results = await api.searchMemories(searchQuery);
+        return results.map(r => ({
+          id: r.id,
+          title: r.title,
+          memory_type: r.memory_type,
+          summary: r.content,
+          created_at: new Date().toISOString()
+        }));
+      }
+      return api.getMemories(filter || undefined);
+    },
     errorMessage: "Failed to load memories",
   });
 

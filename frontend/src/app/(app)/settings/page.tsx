@@ -8,7 +8,8 @@ import {
   Palette,
   CreditCard,
   Bell,
-  LogOut
+  LogOut,
+  Brain
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
@@ -27,7 +28,23 @@ export default function SettingsPage() {
     window.location.href = "/login";
   };
 
-  const sections = [
+  interface SettingField {
+    label: string;
+    value: string;
+    type: "text" | "badge" | "toggle" | "action";
+    actionText?: string;
+    active?: boolean;
+  }
+
+  interface SettingSection {
+    title: string;
+    icon: any;
+    color: string;
+    bg: string;
+    fields: SettingField[];
+  }
+
+  const sections: SettingSection[] = [
     {
       title: "Profile",
       icon: User,
