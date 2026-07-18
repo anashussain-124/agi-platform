@@ -1,2 +1,13 @@
 .vercel
 .env*
+# Test artifacts
+login.json
+test_eb.sh
+test_eb.py
+test_skills.py
+test_learn.py
+goal.json
+hdr.txt
+# Generated skill dumps (skills_bundle.json is the committed source-of-truth)
+skills/
+skills_index.json

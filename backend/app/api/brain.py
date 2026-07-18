@@ -22,6 +22,43 @@ ai_service = OpenRouterService()
 
 
 # ──────────────────────────────────────────────────────────
+# Skills: import Hermes library + list/search
+# ──────────────────────────────────────────────────────────
+
+class SkillOut(BaseModel):
+    name: str
+    description: str
+    category: str
+    file: str
+    learned: bool
+
+
+@router.post("/skills/import")
+async def import_skills(user: User = Depends(get_current_user),
+                        db: AsyncSession = Depends(get_async_session)):
+    """Load the bundled Hermes skills into Supabase as procedural memories."""
+    from app.services import skill_library as sl
+    brain_id = await _get_user_brain_id(user, db)
+    summary = await sl.import_bundle_to_supabase(brain_id)
+    return summary
+
+
+@router.get("/skills")
+async def list_skills(q: Optional[str] = None, limit: int = 20,
+                      user: User = Depends(get_current_user),
+                      db: AsyncSession = Depends(get_async_session)):
+    """List/search imported skills. Pass ?q=term to search (Supabase-backed)."""
+    from app.services import skill_library as sl
+    brain_id = await _get_user_brain_id(user, db)
+    if q:
+        return await sl.search_skills(q, brain_id=brain_id, limit=limit)
+    # no query -> return bundle metadata (name/category) as a lightweight list
+    bundle = sl.load_bundle()
+    return [{"name": s["name"], "category": s["category"],
+             "description": s["description"]} for s in bundle[:limit]]
+
+
+# ──────────────────────────────────────────────────────────
 # Repository
 # ──────────────────────────────────────────────────────────
 

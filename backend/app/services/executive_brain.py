@@ -22,6 +22,7 @@ from app.core.repository import is_supabase_mode, get_supabase
 from app.agents.orchestrator import AgentOrchestrator, AgentType
 from app.agents.agent_config import AGENT_TYPE_MAP
 from app.services.ai_service import OpenRouterService
+from app.services.skill_library import discover_relevant_skills, learn_skill
 
 
 # ──────────────────────────────────────────────────────────
@@ -276,6 +277,15 @@ class ExecutiveBrain:
         memory_ctx = await self._load_memory_context()
         combined_context = "\n\n".join(filter(None, [memory_ctx, context or ""]))
 
+        # Inject any relevant imported/learned skills so agents reuse proven workflows.
+        skills_block = await discover_relevant_skills(goal_text, brain_id=self.brain_id, limit=3)
+        if skills_block:
+            combined_context = (
+                combined_context
+                + "\n\n# Available Skills (reuse these workflows when relevant)\n"
+                + skills_block
+            )
+
         # 1. Decompose the goal into a plan.
         plan = await self._decompose_goal(goal_text, combined_context)
 
@@ -340,6 +350,14 @@ class ExecutiveBrain:
             self.db,
         )
 
+        # 6. Auto-learn: distil a reusable skill from this goal if it succeeded.
+        learned_file = None
+        if completed >= 1:
+            try:
+                learned_file = await learn_skill(goal_text, steps_out, self.brain_id)
+            except Exception as e:
+                logger.warning("Auto-learn failed: %s", str(e)[:160])
+
         return {
             "goal_id": goal_id,
             "goal": goal_text,
@@ -347,6 +365,7 @@ class ExecutiveBrain:
             "progress": progress,
             "plan": plan,
             "steps": steps_out,
+            "learned_skill": learned_file,
         }
 
     async def quick_plan(self, goal_text: str, context: Optional[str] = None) -> dict:
